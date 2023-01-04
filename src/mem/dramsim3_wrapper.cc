@@ -69,6 +69,8 @@ DRAMsim3Wrapper::DRAMsim3Wrapper(const std::string& config_file,
                                        read_cb, write_cb)),
     _clockPeriod(0.0), _queueSize(0), _burstSize(0)
 {
+    std::cout<< "config_file: " << config_file<< std::endl;
+    std::cout<< "working_dir: " << working_dir<< std::endl;
     // there is no way of getting DRAMsim3 to tell us what frequency
     // it is assuming, so we have to extract it ourselves
     _clockPeriod = dramsim->GetTCK();

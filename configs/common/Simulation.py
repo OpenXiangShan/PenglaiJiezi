@@ -80,10 +80,10 @@ def setCPUClass(options):
         CPUClass = TmpClass
         TmpClass = AtomicSimpleCPU
         test_mem_mode = 'atomic'
-    # TODO
-    elif options.generic_rv_cpt and options.standard_switch:
-        CPUClass = TmpClass
-        TmpClass = TimingSimpleCPU
+    ## TODO:zql: delete this for se.py mode, open this for fs.py
+    #elif options.generic_rv_cpt and options.standard_switch:
+    #    CPUClass = TmpClass
+    #    TmpClass = TimingSimpleCPU
 
     # Ruby only supports atomic accesses in noncaching mode
     if test_mem_mode == 'atomic' and options.ruby:

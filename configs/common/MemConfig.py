@@ -137,6 +137,7 @@ def config_mem(options, system):
     opt_xor_low_bit = getattr(options, "xor_low_bit", 0)
 
     opt_dramsim3_ini = getattr(options, 'dramsim3_ini', None)
+    opt_dramsim3_outdir = getattr(options, 'dramsim3_outdir', None)
 
     if opt_mem_type == "HMC_2500_1x32":
         HMChost = HMC.config_hmc_host_ctrl(options, system)
@@ -224,6 +225,8 @@ def config_mem(options, system):
                 if hasattr(m5.objects, 'DRAMsim3') and issubclass(intf, m5.objects.DRAMsim3):
                     if opt_dramsim3_ini:
                         dram_intf.configFile = opt_dramsim3_ini
+                    if opt_dramsim3_outdir:
+                        dram_intf.filePath = opt_dramsim3_outdir
                     mem_ctrl = dram_intf
                 else:
                     mem_ctrl = dram_intf.controller()

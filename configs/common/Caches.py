@@ -98,7 +98,7 @@ class L3Cache(Cache):
     tag_latency = 2
     data_latency = 5
     # This is L3 miss latency, which should be modeled with memory controller
-    response_latency = 0
+    response_latency = 140
 
 class IOCache(Cache):
     assoc = 8

@@ -136,6 +136,8 @@ def addNoISAOptions(parser):
     # DRAMsim3 option
     parser.add_argument("--dramsim3-ini",type=str,default=None,
                         help = "dramsim3 config file")
+    parser.add_argument("--dramsim3-outdir",type=str,default=None,
+                        help = "dramsim3 stats file output dir")
 
     # Cache Options
     parser.add_argument("--external-memory-system", type=str,
