@@ -49,6 +49,7 @@
 
 #include "arch/generic/tlb.hh"
 #include "arch/riscv/regs/misc.hh"
+#include "arch/riscv/insts/static_inst.hh"
 #include "base/cprintf.hh"
 #include "base/loader/symtab.hh"
 #include "base/logging.hh"
@@ -218,6 +219,14 @@ BaseCPU::BaseCPU(const Params &p, bool is_checker)
         warn("Difftest is disabled\n");
         diffAllStates->hasCommit = true;
     }
+
+    registerExitCallback([this]() {
+        auto out_handle = simout.create("dumpCommit.txt", false, true);
+        for (auto iter : committedInsts) {
+            *out_handle->stream() << std::hex << iter.first << " " << iter.second << std::endl;
+        }
+        simout.close(out_handle);
+    });
 }
 
 void
@@ -896,6 +905,8 @@ BaseCPU::diffWithNEMU(ThreadID tid, InstSeqNum seq)
     DPRINTF(Diff, "Inst [sn:%llu] @ %#lx in GEM5 is %s\n", seq,
             diffInfo.pc->instAddr(),
             diffInfo.inst->disassemble(diffInfo.pc->instAddr()));
+    auto machInst = dynamic_cast<RiscvISA::RiscvStaticInst &>(*diffInfo.inst).machInst;
+    DPRINTF(Diff, "MachInst: %#lx\n", machInst);
     if (diffInfo.inst->numDestRegs() > 0) {
         const auto &dest = diffInfo.inst->destRegIdx(0);
         auto dest_tag = dest.index() + dest.isFloatReg() * 32;
@@ -1075,7 +1086,12 @@ BaseCPU::difftestStep(ThreadID tid, InstSeqNum seq)
             }
         }
     }
-    DPRINTF(Diff, "commit_pc: %s\n", diffInfo.pc);
+    committedInstNum++;
+    bool dumpFlag = false;
+    if (dumpFlag && committedInstNum >= 37164) {
+        committedInsts.push_back(std::make_pair(diffInfo.pc->instAddr(), diffInfo.inst->disassemble(diffInfo.pc->instAddr()).c_str()));
+    }
+    DPRINTF(Diff, "commit_pc: %s, committedInstNum: %d\n", diffInfo.pc, committedInstNum);
 }
 
 void
