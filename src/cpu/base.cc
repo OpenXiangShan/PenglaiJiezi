@@ -48,6 +48,7 @@
 #include <string>
 
 #include "arch/generic/tlb.hh"
+#include "arch/riscv/insts/static_inst.hh"
 #include "arch/riscv/regs/misc.hh"
 #include "base/cprintf.hh"
 #include "base/loader/symtab.hh"
@@ -218,6 +219,15 @@ BaseCPU::BaseCPU(const Params &p, bool is_checker)
         warn("Difftest is disabled\n");
         diffAllStates->hasCommit = true;
     }
+
+    registerExitCallback([this]() {
+        auto out_handle = simout.create("dumpCommit.txt", false, true);
+        for (auto iter : committedInsts) {
+            *out_handle->stream() << std::hex \
+                << iter.first << " " << iter.second << std::endl;
+        }
+        simout.close(out_handle);
+    });
 }
 
 void
@@ -899,6 +909,9 @@ BaseCPU::diffWithNEMU(ThreadID tid, InstSeqNum seq)
     DPRINTF(Diff, "Inst [sn:%llu] @ %#lx in GEM5 is %s\n", seq,
             diffInfo.pc->instAddr(),
             diffInfo.inst->disassemble(diffInfo.pc->instAddr()));
+    auto machInst = dynamic_cast<RiscvISA::RiscvStaticInst &> \
+                (*diffInfo.inst).machInst;
+    DPRINTF(Diff, "MachInst: %#lx\n", machInst);
     if (diffInfo.inst->numDestRegs() > 0) {
         const auto &dest = diffInfo.inst->destRegIdx(0);
         auto dest_tag = dest.index() + dest.isFloatReg() * 32;
@@ -939,13 +952,26 @@ BaseCPU::diffWithNEMU(ThreadID tid, InstSeqNum seq)
                                 diffInfo.getSrcReg(src));
                         // threadContexts[curThread]->getReg(src));
                     }
+                    bool skipCSR = false;
+                    for (auto iter : skipCSRs) {
+                        if ((machInst & 0xfff00073) == iter) {
+                            skipCSR = true;
+                            DPRINTF(Diff, "This is an csr instruction,"
+                                        " skip!\n");
+                            diffAllStates->referenceRegFile[dest_tag]
+                                         = gem5_val;
+                            diffAllStates->proxy->regcpy(
+                                diffAllStates->referenceRegFile, DUT_TO_REF);
+                            break;
+                        }
+                    }
                     DPRINTF(Diff, "Inst src count: %u, dest count: %u\n",
                             diffInfo.inst->numSrcRegs(),
                             diffInfo.inst->numDestRegs());
                     warn("Inst [sn:%lli] pc: %#lx\n", seq, diffInfo.pc->instAddr());
                     warn("Diff at %s Ref value: %#lx, GEM5 value: %#lx\n",
                          reg_name[dest_tag], nemu_val, gem5_val);
-                    if (!diff_at)
+                    if (!diff_at && !skipCSR)
                         diff_at = ValueDiff;
                 }
             }
@@ -1085,7 +1111,15 @@ BaseCPU::difftestStep(ThreadID tid, InstSeqNum seq)
             }
         }
     }
-    DPRINTF(Diff, "commit_pc: %s\n", diffInfo.pc);
+    committedInstNum++;
+    bool dumpFlag = false;
+    if (dumpFlag && committedInstNum >= 37164) {
+        committedInsts.push_back(std::make_pair(
+                diffInfo.pc->instAddr(),
+                diffInfo.inst->disassemble(diffInfo.pc->instAddr()).c_str()));
+    }
+    DPRINTF(Diff, "commit_pc: %s, committedInstNum:"
+                " %d\n", diffInfo.pc, committedInstNum);
 }
 
 void

@@ -728,6 +728,10 @@ class BaseCPU : public ClockedObject
     {
         this->diffAllStates = diffAllStates;
     }
+
+    int committedInstNum = 0;
+
+    std::vector<std::pair<Addr, std::string>> committedInsts;
 };
 
 } // namespace gem5

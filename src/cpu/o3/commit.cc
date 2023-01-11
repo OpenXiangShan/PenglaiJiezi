@@ -45,8 +45,9 @@
 #include <set>
 #include <string>
 
-#include "arch/riscv/regs/misc.hh"
 #include "arch/riscv/faults.hh"
+#include "arch/riscv/insts/static_inst.hh"
+#include "arch/riscv/regs/misc.hh"
 #include "base/compiler.hh"
 #include "base/loader/symtab.hh"
 #include "base/logging.hh"
@@ -65,6 +66,7 @@
 #include "debug/Diff.hh"
 #include "debug/Drain.hh"
 #include "debug/ExecFaulting.hh"
+#include "debug/Faults.hh"
 #include "debug/HtmCpu.hh"
 #include "debug/O3PipeView.hh"
 #include "params/BaseO3CPU.hh"
@@ -1284,6 +1286,12 @@ Commit::commitHead(const DynInstPtr &head_inst, unsigned inst_num)
         DPRINTF(Commit,
             "[tid:%i] [sn:%llu] %s Committing instruction with fault\n",
             tid, head_inst->seqNum, head_inst->staticInst->disassemble(head_inst->pcState().instAddr()).c_str());
+            "[tid:%i] [sn:%llu] Committing instruction with fault\n",
+            tid, head_inst->seqNum);
+
+        DPRINTF(Faults, "[tid:%i] [sn:%llu] Fault instruction machInst: %lx\n",
+            tid, head_inst->seqNum, dynamic_cast<RiscvISA::RiscvStaticInst &>
+                (*head_inst->staticInst).machInst);
         if (head_inst->traceData) {
             // We ignore ReExecution "faults" here as they are not real
             // (architectural) faults but signal flush/replays.

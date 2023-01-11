@@ -5,6 +5,7 @@
 
 #include <cassert>
 #include <cstring>
+#include <vector>
 
 #ifndef NUM_CORES
 #define NUM_CORES 1
@@ -142,6 +143,8 @@ enum DiffAt
     InstDiff,
     ValueDiff,
 };
+
+extern const std::vector<uint64_t> skipCSRs;
 
 extern uint8_t *pmemStart;
 extern uint64_t pmemSize;
