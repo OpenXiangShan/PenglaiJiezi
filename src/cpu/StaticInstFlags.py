@@ -46,7 +46,11 @@ class StaticInstFlags(Enum):
     enum_name = 'Flags'
 
     vals = [
+        'IsOper16',
+        'IsOper32',
+        'IsOper64',
         'IsNop',            # Is a no-op (no effect at all).
+        'IsMov',
 
         'IsInteger',        # References integer regs.
         'IsFloating',       # References FP regs.

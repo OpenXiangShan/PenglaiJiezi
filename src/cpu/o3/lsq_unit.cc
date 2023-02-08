@@ -272,9 +272,14 @@ LSQUnit::LSQUnitStats::LSQUnitStats(statistics::Group *parent)
                "Number of times an access to memory failed due to the cache "
                "being blocked"),
       ADD_STAT(loadToUse, "Distribution of cycle latency between the "
-                "first time a load is issued and its completion")
+                "first time a load is issued and its completion"),
+      ADD_STAT(loadTranslationLat, "Distribution of cycle latency between the "
+                "first time a load is issued and its translation completion")
 {
     loadToUse
+        .init(0, 299, 10)
+        .flags(statistics::nozero);
+    loadTranslationLat
         .init(0, 299, 10)
         .flags(statistics::nozero);
 }
@@ -520,6 +525,8 @@ LSQUnit::checkViolations(typename LoadQueue::iterator& loadIt,
      * all instructions that will execute before the store writes back. Thus,
      * like the implementation that came before it, we're overly conservative.
      */
+    DPRINTF(LSQUnit, "Checking for violations for store [sn:%lli], addr: %#lx\n",
+            inst->seqNum, inst->effAddr);
     while (loadIt != loadQueue.end()) {
         DynInstPtr ld_inst = loadIt->instruction();
         if (!ld_inst->effAddrValid() || ld_inst->strictlyOrdered()) {
@@ -531,6 +538,8 @@ LSQUnit::checkViolations(typename LoadQueue::iterator& loadIt,
         Addr ld_eff_addr2 =
             (ld_inst->effAddr + ld_inst->effSize - 1) >> depCheckShift;
 
+        DPRINTF(LSQUnit, "Checking for violations for load [sn:%lli], addr: %#lx\n",
+                ld_inst->seqNum, ld_inst->effAddr);
         if (inst_eff_addr2 >= ld_eff_addr1 && inst_eff_addr1 <= ld_eff_addr2) {
             if (inst->isLoad()) {
                 // If this load is to the same block as an external snoop
@@ -566,6 +575,11 @@ LSQUnit::checkViolations(typename LoadQueue::iterator& loadIt,
                 if (memDepViolator && ld_inst->seqNum > memDepViolator->seqNum)
                     break;
 
+                DPRINTF(LSQUnit,
+                        "ld_eff_addr1: %#x, ld_eff_addr2: %#x, "
+                        "inst_eff_addr1: %#x, inst_eff_addr2: %#x\n",
+                        ld_eff_addr1, ld_eff_addr2, inst_eff_addr1,
+                        inst_eff_addr2);
                 DPRINTF(LSQUnit, "Detected fault with inst [sn:%lli] and "
                         "[sn:%lli] at address %#x\n",
                         inst->seqNum, ld_inst->seqNum, ld_eff_addr1);
@@ -729,11 +743,24 @@ LSQUnit::commitLoad()
 
     // Update histogram with memory latency from load
     // Only take latency from load demand that where issued and did not fault
-    if (!inst->isInstPrefetch() && !inst->isDataPrefetch()
-            && inst->firstIssue != -1
-            && inst->lastWakeDependents != -1) {
-        stats.loadToUse.sample(cpu->ticksToCycles(
-                    inst->lastWakeDependents - inst->firstIssue));
+    if (!inst->isInstPrefetch() && !inst->isDataPrefetch()) {
+        uint64_t translation_lat = 0;
+        if (inst->firstIssue != -1 && inst->translatedTick != -1) {
+            translation_lat =
+                cpu->ticksToCycles(inst->translatedTick - inst->firstIssue);
+            stats.loadTranslationLat.sample(translation_lat);
+        }
+        if (inst->firstIssue != -1 && inst->lastWakeDependents != -1) {
+            auto load_to_use = cpu->ticksToCycles(
+                inst->lastWakeDependents - inst->firstIssue);
+            stats.loadToUse.sample(load_to_use);
+            if (((uint64_t) load_to_use) > 2000) {
+                inst->printDisassembly();
+                DPRINTF(CommitTrace,
+                        "Inst[sn:%lu] load2use = %lu, translation lat = %lu\n",
+                        inst->seqNum, load_to_use, translation_lat);
+            }
+        }
     }
 
     loadQueue.front().clear();

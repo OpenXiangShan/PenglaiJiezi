@@ -59,19 +59,27 @@ class IntMultDiv(FUDesc):
 
     count=2
 
-class FP_ALU(FUDesc):
-    opList = [ OpDesc(opClass='FloatAdd', opLat=3),
-               OpDesc(opClass='FloatCmp', opLat=2),
-               OpDesc(opClass='FloatCvt', opLat=3) ]
+class FP_SLOW(FUDesc):
+    opList = [OpDesc(opClass='FloatDiv', opLat=19, pipelined=False),
+              OpDesc(opClass='FloatSqrt', opLat=24, pipelined=False),
+              ]
+    count = 2
+
+class FP_MISC(FUDesc):
+    opList = [OpDesc(opClass='FloatCvt', opLat=3),
+              OpDesc(opClass='FloatCmp', opLat=3),
+              OpDesc(opClass='FloatMisc', opLat=2),]
+    count = 2
+
+class FP_MAM(FUDesc):
+    opList = [ OpDesc(opClass='FMAMul', opLat=3),
+               OpDesc(opClass='FloatMult', opLat=3),]
     count = 4
 
-class FP_MultDiv(FUDesc):
-    opList = [ OpDesc(opClass='FloatMult', opLat=3),
-               OpDesc(opClass='FloatMultAcc', opLat=5),
-               OpDesc(opClass='FloatMisc', opLat=3),
-               OpDesc(opClass='FloatDiv', opLat=19, pipelined=False),
-               OpDesc(opClass='FloatSqrt', opLat=24, pipelined=False) ]
-    count = 2
+class FP_MAA(FUDesc):
+    opList = [ OpDesc(opClass='FMAAcc', opLat=2),
+               OpDesc(opClass='FloatAdd', opLat=3)]
+    count = 4
 
 class SIMD_Unit(FUDesc):
     opList = [ OpDesc(opClass='SimdAdd'),
@@ -178,12 +186,32 @@ class DefaultDelayMatrix(DelayCalibrator):
                                completed_opclass='IntAlu', delay_tick=0),
         ScheduleDelayMatrixMap(dep_opclass='MemRead',
                                completed_opclass='MemRead', delay_tick=1),
+        ScheduleDelayMatrixMap(dep_opclass='IntAlu',
+                               completed_opclass='MemRead', delay_tick=0),
+
+        ScheduleDelayMatrixMap(dep_opclass='FMAAcc',
+                               completed_opclass='FloatMemRead', delay_tick=1),
+        ScheduleDelayMatrixMap(dep_opclass='FMAMul',
+                               completed_opclass='FloatMemRead', delay_tick=1),
+        ScheduleDelayMatrixMap(dep_opclass='FloatMult',
+                               completed_opclass='FloatMemRead', delay_tick=1),
+        ScheduleDelayMatrixMap(dep_opclass='FloatAdd',
+                               completed_opclass='FloatMemRead', delay_tick=1),
+        ScheduleDelayMatrixMap(dep_opclass='FMAAcc',
+                               completed_opclass='FloatCvt', delay_tick=2),
+        ScheduleDelayMatrixMap(dep_opclass='FMAMul',
+                               completed_opclass='FloatCvt', delay_tick=2),
+        ScheduleDelayMatrixMap(dep_opclass='FloatMult',
+                               completed_opclass='FloatCvt', delay_tick=2),
+        ScheduleDelayMatrixMap(dep_opclass='FloatAdd',
+                               completed_opclass='FloatCvt', delay_tick=2),
+
         # load to use
         # maybe we need to recalibrate in the future
         ScheduleDelayMatrixMap(dep_opclass='MemRead',
                                completed_opclass='MemWrite', delay_tick=3),
         ScheduleDelayMatrixMap(dep_opclass='MemWrite',
-                               completed_opclass='MemRead', delay_tick=3),
-        ScheduleDelayMatrixMap(dep_opclass='IntMult',
                                completed_opclass='MemRead', delay_tick=2),
+        ScheduleDelayMatrixMap(dep_opclass='IntMult',
+                               completed_opclass='MemRead', delay_tick=1),
         ScheduleDelayMatrixMap(dep_opclass='IntDiv', completed_opclass='MemRead', delay_tick=1)]

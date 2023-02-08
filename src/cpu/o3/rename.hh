@@ -106,6 +106,19 @@ class Rename
         SerializeStall
     };
 
+    enum StallEvent
+    {
+        ROBWalk=0,
+        IEWStall,
+        ROBFull,
+        IQFull,
+        LSQFull,
+        RegFull,
+        SerializeInst,
+        BWFull,
+        StallEventCount
+    };
+
   private:
     /** Rename status. */
     RenameStatus _status;
@@ -320,6 +333,8 @@ class Rename
      */
     std::list<RenameHistory> historyBuffer[MaxThreads];
 
+    void tryFreePReg(PhysRegIdPtr phys_reg);
+
     /** Pointer to CPU. */
     CPU *cpu;
 
@@ -532,6 +547,8 @@ class Rename
         statistics::Scalar tempSerializing;
         /** Number of instructions inserted into skid buffers. */
         statistics::Scalar skidInsts;
+
+        statistics::Vector stallEvents;
     } stats;
 };
 

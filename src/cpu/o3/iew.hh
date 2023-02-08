@@ -41,6 +41,7 @@
 #ifndef __CPU_O3_IEW_HH__
 #define __CPU_O3_IEW_HH__
 
+#include <map>
 #include <queue>
 #include <set>
 
@@ -105,6 +106,17 @@ class IEW
         StartSquash,
         Squashing,
         Unblocking
+    };
+
+    enum StallEvent
+    {
+        CacheMiss=0,
+        Translation,
+        ROBWalk,
+        IQFull,
+        LSQFull,
+        DispBWFull,
+        StallEventCount
     };
 
   private:
@@ -330,10 +342,10 @@ class IEW
     TimeBuffer<IEWStruct>::wire toCommit;
 
     /** Queue of all instructions coming from rename this cycle. */
-    std::queue<DynInstPtr> insts[MaxThreads];
+    std::deque<DynInstPtr> insts[MaxThreads];
 
     /** Skid buffer between rename and IEW. */
-    std::queue<DynInstPtr> skidBuffer[MaxThreads];
+    std::deque<DynInstPtr> skidBuffer[MaxThreads];
 
     /** Scoreboard pointer. */
     Scoreboard* scoreboard;
@@ -488,6 +500,8 @@ class IEW
         statistics::Formula wbRate;
         /** Average number of woken instructions per writeback. */
         statistics::Formula wbFanout;
+
+        statistics::Vector stallEvents;
     } iewStats;
 };
 

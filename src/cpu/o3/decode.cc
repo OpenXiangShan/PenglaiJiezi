@@ -48,6 +48,7 @@
 #include "cpu/o3/limits.hh"
 #include "debug/Activity.hh"
 #include "debug/Decode.hh"
+#include "debug/DecoupleBP.hh"
 #include "debug/O3PipeView.hh"
 #include "params/BaseO3CPU.hh"
 #include "sim/full_system.hh"
@@ -298,7 +299,13 @@ Decode::squash(const DynInstPtr &inst, ThreadID tid)
     toFetch->decodeInfo[tid].mispredictInst = inst;
     toFetch->decodeInfo[tid].squash = true;
     toFetch->decodeInfo[tid].doneSeqNum = inst->seqNum;
-    set(toFetch->decodeInfo[tid].nextPC, *inst->branchTarget());
+    if (inst->isControl()) {
+        set(toFetch->decodeInfo[tid].nextPC, *inst->branchTarget());
+    } else {
+        std::unique_ptr<PCStateBase> npc_ptr(inst->pcState().clone());
+        npc_ptr->as<RiscvISA::PCState>().set(inst->pcState().getFallThruPC());
+        set(toFetch->decodeInfo[tid].nextPC, *npc_ptr);
+    }
 
     // Looking at inst->pcState().branching()
     // may yield unexpected results if the branch
@@ -333,11 +340,11 @@ Decode::squash(const DynInstPtr &inst, ThreadID tid)
     // Clear the instruction list and skid buffer in case they have any
     // insts in them.
     while (!insts[tid].empty()) {
-        insts[tid].pop();
+        insts[tid].pop_front();
     }
 
     while (!skidBuffer[tid].empty()) {
-        skidBuffer[tid].pop();
+        skidBuffer[tid].pop_front();
     }
 
     // Squash instructions up until this one
@@ -381,11 +388,11 @@ Decode::squash(ThreadID tid)
     // Clear the instruction list and skid buffer in case they have any
     // insts in them.
     while (!insts[tid].empty()) {
-        insts[tid].pop();
+        insts[tid].pop_front();
     }
 
     while (!skidBuffer[tid].empty()) {
-        skidBuffer[tid].pop();
+        skidBuffer[tid].pop_front();
     }
 
     return squash_count;
@@ -399,11 +406,11 @@ Decode::skidInsert(ThreadID tid)
     while (!insts[tid].empty()) {
         inst = insts[tid].front();
 
-        insts[tid].pop();
+        insts[tid].pop_front();
 
         assert(tid == inst->threadNumber);
 
-        skidBuffer[tid].push(inst);
+        skidBuffer[tid].push_back(inst);
 
         DPRINTF(Decode, "Inserting [tid:%d][sn:%lli] PC: %s into decode "
                 "skidBuffer %i\n", inst->threadNumber, inst->seqNum,
@@ -473,7 +480,7 @@ Decode::sortInsts()
 {
     int insts_from_fetch = fromFetch->size;
     for (int i = 0; i < insts_from_fetch; ++i) {
-        insts[fromFetch->insts[i]->threadNumber].push(fromFetch->insts[i]);
+        insts[fromFetch->insts[i]->threadNumber].push_back(fromFetch->insts[i]);
     }
 }
 
@@ -647,18 +654,31 @@ Decode::decodeInsts(ThreadID tid)
         ++stats.runCycles;
     }
 
-    std::queue<DynInstPtr>
+    std::deque<DynInstPtr>
         &insts_to_decode = decodeStatus[tid] == Unblocking ?
         skidBuffer[tid] : insts[tid];
 
     DPRINTF(Decode, "[tid:%i] Sending instruction to rename.\n",tid);
 
-    while (insts_available > 0 && toRenameIndex < decodeWidth) {
+    int decode_width = decodeWidth;
+    int count_ = 0;
+    for (auto it : insts_to_decode) {
+        count_++;
+        if (it->opClass() == FMAAccOp) {
+            decode_width++;
+        }
+        if (count_ >= decodeWidth ||
+            decode_width >= decodeWidth * 2) {
+            break;
+        }
+    }
+
+    while (insts_available > 0 && toRenameIndex < decode_width) {
         assert(!insts_to_decode.empty());
 
         DynInstPtr inst = std::move(insts_to_decode.front());
 
-        insts_to_decode.pop();
+        insts_to_decode.pop_front();
 
         DPRINTF(Decode, "[tid:%i] Processing instruction [sn:%lli] with "
                 "PC %s\n", tid, inst->seqNum, inst->pcState());
@@ -696,13 +716,15 @@ Decode::decodeInsts(ThreadID tid)
 #if TRACING_ON
         if (debug::O3PipeView) {
             inst->decodeTick = curTick() - inst->fetchTick;
+            DPRINTF(O3PipeView, "Record decode for inst sn:%lu\n",
+                    inst->seqNum);
         }
 #endif
 
         // Ensure that if it was predicted as a branch, it really is a
         // branch.
         if (inst->readPredTaken() && !inst->isControl()) {
-            panic("Instruction predicted as a branch!");
+            // panic("Instruction predicted as a branch!");
 
             ++stats.controlMispred;
 
@@ -722,6 +744,15 @@ Decode::decodeInsts(ThreadID tid)
             ++stats.branchResolved;
 
             std::unique_ptr<PCStateBase> target = inst->branchTarget();
+            auto &t = target->as<RiscvISA::PCState>();
+            auto &pred = inst->readPredTarg().as<RiscvISA::PCState>();
+            if (t.start_equals(pred) && !t.equals(pred)) {
+                DPRINTF(
+                    DecoupleBP,
+                    "Override useless npc, from %#lx->%#lx to %#lx->%#lx\n",
+                    pred.pc(), pred.npc(), t.pc(), t.npc());
+                inst->setPredTarg(t);
+            }
             if (*target != inst->readPredTarg()) {
                 ++stats.branchMispred;
 
@@ -739,14 +770,20 @@ Decode::decodeInsts(ThreadID tid)
                 squash(inst, inst->threadNumber);
 
                 DPRINTF(Decode,
-                        "[tid:%i] [sn:%llu] "
-                        "Updating predictions: Wrong predicted target: %s \
-                        PredPC: %s\n",
+                        "[tid:%i] [sn:%llu] Updating predictions:"
+                        " Wrong predicted target: %s PredPC: %s\n",
                         tid, inst->seqNum, inst->readPredTarg(), *target);
                 //The micro pc after an instruction level branch should be 0
                 inst->setPredTarg(*target);
                 break;
             }
+        }
+        if (inst->isNonSpeculative() && inst->readPredTaken()) {
+            // TODO: redirect to fall thru
+            std::unique_ptr<PCStateBase> npc(inst->pcState().clone());
+            npc->as<RiscvISA::PCState>().set(inst->pcState().getFallThruPC());
+            inst->setPredTaken(false);
+            inst->setPredTarg(*npc);
         }
     }
 

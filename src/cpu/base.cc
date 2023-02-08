@@ -50,6 +50,7 @@
 #include "arch/generic/tlb.hh"
 #include "arch/riscv/insts/static_inst.hh"
 #include "arch/riscv/regs/misc.hh"
+#include "arch/riscv/insts/static_inst.hh"
 #include "base/cprintf.hh"
 #include "base/loader/symtab.hh"
 #include "base/logging.hh"
@@ -61,6 +62,7 @@
 #include "debug/Mwait.hh"
 #include "debug/SyscallVerbose.hh"
 #include "debug/Thread.hh"
+#include "debug/DumpCommit.hh"
 #include "mem/page_table.hh"
 #include "params/BaseCPU.hh"
 #include "sim/clocked_object.hh"
@@ -154,7 +156,9 @@ BaseCPU::BaseCPU(const Params &p, bool is_checker)
       powerGatingOnIdle(p.power_gating_on_idle),
       enterPwrGatingEvent([this] { enterPwrGating(); }, name()),
       warmupInstCount(p.warmupInstCount),
-      enableDifftest(p.enable_difftest)
+      enableDifftest(p.enable_difftest),
+      dumpCommitFlag(p.dump_commit),
+      dumpStartNum(p.dump_start)
 {
     // if Python did not provide a valid ID, do it here
     if (_cpuId == -1 ) {
@@ -220,14 +224,15 @@ BaseCPU::BaseCPU(const Params &p, bool is_checker)
         diffAllStates->hasCommit = true;
     }
 
-    registerExitCallback([this]() {
-        auto out_handle = simout.create("dumpCommit.txt", false, true);
-        for (auto iter : committedInsts) {
-            *out_handle->stream() << std::hex \
-                << iter.first << " " << iter.second << std::endl;
-        }
-        simout.close(out_handle);
-    });
+    if (dumpCommitFlag) {
+        registerExitCallback([this]() {
+            auto out_handle = simout.create("dumpCommit.txt", false, true);
+            for (auto iter : committedInsts) {
+                *out_handle->stream() << std::hex << iter.first << " " << iter.second << std::endl;
+            }
+            simout.close(out_handle);
+        });
+    }
 }
 
 void
@@ -909,8 +914,12 @@ BaseCPU::diffWithNEMU(ThreadID tid, InstSeqNum seq)
     DPRINTF(Diff, "Inst [sn:%llu] @ %#lx in GEM5 is %s\n", seq,
             diffInfo.pc->instAddr(),
             diffInfo.inst->disassemble(diffInfo.pc->instAddr()));
+<<<<<<< HEAD
     auto machInst = dynamic_cast<RiscvISA::RiscvStaticInst &> \
                 (*diffInfo.inst).machInst;
+=======
+    auto machInst = dynamic_cast<RiscvISA::RiscvStaticInst &>(*diffInfo.inst).machInst;
+>>>>>>> ab757e79f24cce6b9921dd864ab73a8dcfb0351a
     DPRINTF(Diff, "MachInst: %#lx\n", machInst);
     if (diffInfo.inst->numDestRegs() > 0) {
         const auto &dest = diffInfo.inst->destRegIdx(0);
@@ -956,12 +965,18 @@ BaseCPU::diffWithNEMU(ThreadID tid, InstSeqNum seq)
                     for (auto iter : skipCSRs) {
                         if ((machInst & 0xfff00073) == iter) {
                             skipCSR = true;
+<<<<<<< HEAD
                             DPRINTF(Diff, "This is an csr instruction,"
                                         " skip!\n");
                             diffAllStates->referenceRegFile[dest_tag]
                                          = gem5_val;
                             diffAllStates->proxy->regcpy(
                                 diffAllStates->referenceRegFile, DUT_TO_REF);
+=======
+                            DPRINTF(Diff, "This is an csr instruction, skip!\n");
+                            diffAllStates->referenceRegFile[dest_tag] = gem5_val;
+                            diffAllStates->proxy->regcpy(diffAllStates->referenceRegFile, DUT_TO_REF);
+>>>>>>> ab757e79f24cce6b9921dd864ab73a8dcfb0351a
                             break;
                         }
                     }
@@ -1055,6 +1070,8 @@ void
 BaseCPU::difftestStep(ThreadID tid, InstSeqNum seq)
 {
     bool should_diff = false;
+    DPRINTF(DumpCommit, "[sn:%llu] %#lx, %s\n",
+            seq, diffInfo.pc->instAddr(), diffInfo.inst->disassemble(diffInfo.pc->instAddr()));
     DPRINTF(Diff, "DiffTest step on inst pc: %#lx: %s\n",
             diffInfo.pc->instAddr(),
             diffInfo.inst->disassemble(diffInfo.pc->instAddr()));
@@ -1112,6 +1129,7 @@ BaseCPU::difftestStep(ThreadID tid, InstSeqNum seq)
         }
     }
     committedInstNum++;
+<<<<<<< HEAD
     bool dumpFlag = false;
     if (dumpFlag && committedInstNum >= 37164) {
         committedInsts.push_back(std::make_pair(
@@ -1120,6 +1138,14 @@ BaseCPU::difftestStep(ThreadID tid, InstSeqNum seq)
     }
     DPRINTF(Diff, "commit_pc: %s, committedInstNum:"
                 " %d\n", diffInfo.pc, committedInstNum);
+=======
+    if (dumpCommitFlag && committedInstNum >= dumpStartNum) {
+        committedInsts.push_back(std::make_pair(
+            diffInfo.pc->instAddr(),
+            diffInfo.inst->disassemble(diffInfo.pc->instAddr()).c_str()));
+    }
+    DPRINTF(Diff, "commit_pc: %s, committedInstNum: %d\n", diffInfo.pc, committedInstNum);
+>>>>>>> ab757e79f24cce6b9921dd864ab73a8dcfb0351a
 }
 
 void

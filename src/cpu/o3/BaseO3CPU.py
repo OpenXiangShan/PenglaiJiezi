@@ -83,9 +83,9 @@ class BaseO3CPU(BaseCPU):
     iewToFetchDelay = Param.Cycles(1, "Issue/Execute/Writeback to fetch "
                                    "delay")
     commitToFetchDelay = Param.Cycles(1, "Commit to fetch delay")
-    fetchWidth = Param.Unsigned(8, "Fetch width")
+    fetchWidth = Param.Unsigned(16, "Fetch width")
     fetchBufferSize = Param.Unsigned(64, "Fetch buffer size in bytes")
-    fetchQueueSize = Param.Unsigned(32, "Fetch queue size in micro-ops "
+    fetchQueueSize = Param.Unsigned(48, "Fetch queue size in micro-ops "
                                     "per-thread")
 
     renameToDecodeDelay = Param.Cycles(1, "Rename to decode delay")
@@ -127,7 +127,7 @@ class BaseO3CPU(BaseCPU):
 
     LQEntries = Param.Unsigned(80, "Number of load queue entries")
     SQEntries = Param.Unsigned(64, "Number of store queue entries")
-    LSQDepCheckShift = Param.Unsigned(4,
+    LSQDepCheckShift = Param.Unsigned(0,
             "Number of places to shift addr before check")
     LSQCheckLoads = Param.Bool(True,
         "Should dependency violations be checked for "
@@ -166,8 +166,7 @@ class BaseO3CPU(BaseCPU):
     smtROBThreshold = Param.Int(100, "SMT ROB Threshold Sharing Parameter")
     smtCommitPolicy = Param.CommitPolicy('RoundRobin', "SMT Commit Policy")
 
-    branchPred = Param.BranchPredictor(TAGE(numThreads =
-                                                       Parent.numThreads),
+    branchPred = Param.BranchPredictor(DecoupledBPUWithFTB(),
                                        "Branch Predictor")
     needsTSO = Param.Bool(False, "Enable TSO Memory model")
 

@@ -195,6 +195,18 @@ def addNoISAOptions(parser):
                         default="{}/build/riscv64-nemu-interpreter-so".format(
                             os.environ['NEMU_HOME']),
                         help="The shared lib file used to do difftest")
+
+    # Dump Commit option
+    parser.add_argument("--dump-commit",
+                        action="store_true",
+                        help="dump commit instructions")
+
+    parser.add_argument("--dump-start",
+                        action="store",
+                        type=int,
+                        default=0,
+                        help="dump commit instructions from this committed number")
+
     # ArchDB option
     parser.add_argument("--enable-arch-db",
                         action="store_true",
@@ -237,6 +249,8 @@ def addCommonOptions(parser):
     parser.add_argument("--indirect-bp-type", default=None,
                         choices=ObjectList.indirect_bp_list.get_names(),
                         help="type of indirect branch predictor to run with")
+    parser.add_argument("--enable-bp-db", default=None, action="store_true",
+                        help="enable bp database")
 
     parser.add_argument("--list-rp-types",
                         action=ListRP, nargs=0,
@@ -441,6 +455,9 @@ def addCommonOptions(parser):
         "once with: system.cpu[:].mmu. If given multiple times, dump stats "
         "that are present under any of the roots. If not given, dump all "
         "stats. ")
+
+    parser.add_argument("--dump-loop-pred", action='store_true', default=False,
+            help="Dump loop predictor logs at exit")
 
 
 def addSEOptions(parser):

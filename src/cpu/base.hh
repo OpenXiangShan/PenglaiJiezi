@@ -668,6 +668,8 @@ class BaseCPU : public ClockedObject
     // difftest
   protected:
     bool enableDifftest;
+    bool dumpCommitFlag;
+    int dumpStartNum;
     std::shared_ptr<DiffAllStates> diffAllStates{};
 
     virtual void readGem5Regs()

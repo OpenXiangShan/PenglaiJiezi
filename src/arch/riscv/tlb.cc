@@ -263,6 +263,7 @@ TLB::createPagefault(Addr vaddr, BaseMMU::Mode mode)
         code = ExceptionCode::STORE_PAGE;
     else
         code = ExceptionCode::INST_PAGE;
+    DPRINTF(TLB, "Create page fault #%i on %#lx\n", code, vaddr);
     return std::make_shared<AddressFault>(vaddr, code);
 }
 
@@ -374,7 +375,7 @@ TLB::translate(const RequestPtr &req, ThreadContext *tc,
             pma->check(req);
 
             // do pmp check if any checking condition is met.
-            // timingFault will be NoFault if pmp checks are
+            // mainFault will be NoFault if pmp checks are
             // passed, otherwise an address fault will be returned.
             fault = pmp->pmpCheck(req, mode, pmode, tc);
         }

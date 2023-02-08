@@ -2,6 +2,7 @@
 #define __COMMON_H__
 
 #include <stdint.h>
+#include <vector>
 
 #include <cassert>
 #include <cstring>

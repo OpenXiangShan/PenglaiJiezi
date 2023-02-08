@@ -54,6 +54,7 @@
 #include "cpu/o3/limits.hh"
 #include "cpu/timebuf.hh"
 #include "debug/Activity.hh"
+#include "debug/DecoupleBP.hh"
 #include "debug/Drain.hh"
 #include "debug/IEW.hh"
 #include "debug/O3PipeView.hh"
@@ -112,7 +113,7 @@ IEW::IEW(CPU *_cpu, const BaseO3CPUParams &params)
 
     updateLSQNextCycle = false;
 
-    skidBufferMax = (renameToIEWDelay + 1) * params.renameWidth;
+    skidBufferMax = (renameToIEWDelay + 1) * params.renameWidth * 2;
 }
 
 std::string
@@ -189,7 +190,9 @@ IEW::IEWStats::IEWStats(CPU *cpu)
              "Insts written-back per cycle"),
     ADD_STAT(wbFanout, statistics::units::Rate<
                 statistics::units::Count, statistics::units::Count>::get(),
-             "Average fanout of values written-back")
+             "Average fanout of values written-back"),
+    ADD_STAT(stallEvents, statistics::units::Count::get(),
+             "Number of events the IEW has stalled")
 {
     instsToCommit
         .init(cpu->numThreads)
@@ -214,6 +217,23 @@ IEW::IEWStats::IEWStats(CPU *cpu)
     wbFanout
         .flags(statistics::total);
     wbFanout = producerInst / consumerInst;
+
+    stallEvents
+        .init(StallEventCount)
+        .flags(statistics::total);
+
+    std::map < StallEvent, const char* > stall_event_str = {
+        { CacheMiss, "CacheMiss" },
+        { Translation, "Translation" },
+        { ROBWalk, "ROBWalk" },
+        { IQFull, "IQFull" },
+        { LSQFull, "LSQFull" },
+        { DispBWFull, "DispBWFull" }
+    };
+
+    for (int i = 0; i < StallEventCount; i++) {
+        stallEvents.subname(i, stall_event_str[static_cast<StallEvent>(i)]);
+    }
 }
 
 IEW::IEWStats::ExecutedInstStats::ExecutedInstStats(CPU *cpu)
@@ -444,7 +464,7 @@ IEW::squash(ThreadID tid)
 
         toRename->iewInfo[tid].dispatched++;
 
-        skidBuffer[tid].pop();
+        skidBuffer[tid].pop_front();
     }
 
     emptyRenameInsts(tid);
@@ -461,6 +481,8 @@ IEW::squashDueToBranch(const DynInstPtr& inst, ThreadID tid)
             inst->seqNum < toCommit->squashedSeqNum[tid]) {
         toCommit->squash[tid] = true;
         toCommit->squashedSeqNum[tid] = inst->seqNum;
+        toCommit->squashedStreamId[tid] = inst->getFsqId();
+        toCommit->squashedTargetId[tid] = inst->getFtqId();
         toCommit->branchTaken[tid] = inst->pcState().branching();
 
         set(toCommit->pc[tid], inst->pcState());
@@ -470,6 +492,13 @@ IEW::squashDueToBranch(const DynInstPtr& inst, ThreadID tid)
         toCommit->includeSquashInst[tid] = false;
 
         wroteToTimeBuffer = true;
+
+        DPRINTF(DecoupleBP,
+                "Branch misprediction (pc=%#lx) set stream id to %lu, target "
+                "id to %lu\n",
+                toCommit->pc[tid]->instAddr(),
+                toCommit->squashedStreamId[tid],
+                toCommit->squashedTargetId[tid]);
     }
 
 }
@@ -490,6 +519,8 @@ IEW::squashDueToMemOrder(const DynInstPtr& inst, ThreadID tid)
         toCommit->squash[tid] = true;
 
         toCommit->squashedSeqNum[tid] = inst->seqNum;
+        toCommit->squashedStreamId[tid] = inst->getFsqId();
+        toCommit->squashedTargetId[tid] = inst->getFtqId();
         set(toCommit->pc[tid], inst->pcState());
         toCommit->mispredictInst[tid] = NULL;
 
@@ -497,6 +528,15 @@ IEW::squashDueToMemOrder(const DynInstPtr& inst, ThreadID tid)
         toCommit->includeSquashInst[tid] = true;
 
         wroteToTimeBuffer = true;
+
+        DPRINTF(DecoupleBP,
+                "Memory violation (pc=%#lx) set stream id to %lu, target id "
+                "to %lu\n",
+                toCommit->pc[tid]->instAddr(),
+                toCommit->squashedStreamId[tid],
+                toCommit->squashedTargetId[tid]);
+
+
     }
 }
 
@@ -585,6 +625,8 @@ IEW::instToCommit(const DynInstPtr& inst)
         }
     }
 
+    inst->completionTick = curTick();
+
     DPRINTF(IEW, "Current wb cycle: %i, width: %i, numInst: %i\nwbActual:%i\n",
             wbCycle, wbWidth, wbNumInst, wbCycle * wbWidth + wbNumInst);
     // Add finished instruction to queue to commit.
@@ -600,13 +642,13 @@ IEW::skidInsert(ThreadID tid)
     while (!insts[tid].empty()) {
         inst = insts[tid].front();
 
-        insts[tid].pop();
+        insts[tid].pop_front();
 
         DPRINTF(IEW,"[tid:%i] Inserting [sn:%lli] PC:%s into "
                 "dispatch skidBuffer %i\n",tid, inst->seqNum,
                 inst->pcState(),tid);
 
-        skidBuffer[tid].push(inst);
+        skidBuffer[tid].push_back(inst);
     }
 
     assert(skidBuffer[tid].size() <= skidBufferMax &&
@@ -697,6 +739,7 @@ IEW::checkStall(ThreadID tid)
         ret_val = true;
     } else if (instQueue.isFull(tid)) {
         DPRINTF(IEW,"[tid:%i] Stall: IQ  is full.\n",tid);
+        iewStats.stallEvents[IQFull]++;
         ret_val = true;
     }
 
@@ -724,6 +767,7 @@ IEW::checkSignalsAndUpdate(ThreadID tid)
 
         dispatchStatus[tid] = Squashing;
         fetchRedirect[tid] = false;
+        iewStats.stallEvents[ROBWalk]++;
         return;
     }
 
@@ -733,6 +777,7 @@ IEW::checkSignalsAndUpdate(ThreadID tid)
         dispatchStatus[tid] = Squashing;
         emptyRenameInsts(tid);
         wroteToTimeBuffer = true;
+        iewStats.stallEvents[ROBWalk]++;
     }
 
     if (checkStall(tid)) {
@@ -775,7 +820,7 @@ IEW::sortInsts()
         assert(insts[tid].empty());
 #endif
     for (int i = 0; i < insts_from_rename; ++i) {
-        insts[fromRename->insts[i]->threadNumber].push(fromRename->insts[i]);
+        insts[fromRename->insts[i]->threadNumber].push_back(fromRename->insts[i]);
     }
 }
 
@@ -796,7 +841,7 @@ IEW::emptyRenameInsts(ThreadID tid)
 
         toRename->iewInfo[tid].dispatched++;
 
-        insts[tid].pop();
+        insts[tid].pop_front();
     }
 }
 
@@ -879,7 +924,7 @@ IEW::dispatchInsts(ThreadID tid)
 {
     // Obtain instructions from skid buffer if unblocking, or queue from rename
     // otherwise.
-    std::queue<DynInstPtr> &insts_to_dispatch =
+    std::deque<DynInstPtr> &insts_to_dispatch =
         dispatchStatus[tid] == Unblocking ?
         skidBuffer[tid] : insts[tid];
 
@@ -889,10 +934,23 @@ IEW::dispatchInsts(ThreadID tid)
     bool add_to_iq = false;
     int dis_num_inst = 0;
 
+    int dispatch_width = dispatchWidth;
+    int count_ = 0;
+    for (auto& it : insts_to_dispatch) {
+        count_++ ;
+        if (it->opClass() == FMAAccOp) {
+            dispatch_width++;
+        }
+        if (count_ >= dispatchWidth ||
+            dispatch_width >= dispatchWidth * 2) {
+            break;
+        }
+    }
+
     // Loop through the instructions, putting them in the instruction
     // queue.
     for ( ; dis_num_inst < insts_to_add &&
-              dis_num_inst < dispatchWidth;
+              dis_num_inst < dispatch_width;
           ++dis_num_inst)
     {
         inst = insts_to_dispatch.front();
@@ -920,7 +978,7 @@ IEW::dispatchInsts(ThreadID tid)
 
             ++iewStats.dispSquashedInsts;
 
-            insts_to_dispatch.pop();
+            insts_to_dispatch.pop_front();
 
             //Tell Rename That An Instruction has been processed
             if (inst->isLoad()) {
@@ -941,7 +999,7 @@ IEW::dispatchInsts(ThreadID tid)
 
             // Call function to start blocking.
             block(tid);
-
+            iewStats.stallEvents[IQFull]++;
             // Set unblock to false. Special case where we are using
             // skidbuffer (unblocking) instructions but then we still
             // get full in the IQ.
@@ -960,6 +1018,7 @@ IEW::dispatchInsts(ThreadID tid)
 
             // Call function to start blocking.
             block(tid);
+            iewStats.stallEvents[LSQFull]++;
 
             // Set unblock to false. Special case where we are using
             // skidbuffer (unblocking) instructions but then we still
@@ -1083,7 +1142,7 @@ IEW::dispatchInsts(ThreadID tid)
             instQueue.insert(inst);
         }
 
-        insts_to_dispatch.pop();
+        insts_to_dispatch.pop_front();
 
         toRename->iewInfo[tid].dispatched++;
 
@@ -1098,6 +1157,7 @@ IEW::dispatchInsts(ThreadID tid)
     if (!insts_to_dispatch.empty()) {
         DPRINTF(IEW,"[tid:%i] Issue: Bandwidth Full. Blocking.\n", tid);
         block(tid);
+        iewStats.stallEvents[DispBWFull]++;
         toRename->iewUnblock[tid] = false;
     }
 
@@ -1277,6 +1337,10 @@ IEW::executeInsts()
 
         updateExeInstStats(inst);
 
+        if (Debug::IEW) {
+            inst->printDisassembly();
+        }
+
         // Check if branch prediction was correct, if not then we need
         // to tell commit to squash in flight instructions.  Only
         // handle this if there hasn't already been something that
@@ -1386,7 +1450,23 @@ IEW::writebackInsts()
     // mark scoreboard that this instruction is finally complete.
     // Either have IEW have direct access to scoreboard, or have this
     // as part of backwards communication.
-    for (int inst_num = 0; inst_num < wbWidth &&
+
+    int wb_width = wbWidth;
+    int count_ = 0;
+    while (toCommit->insts[count_]) {
+        DynInstPtr it = toCommit->insts[count_];
+        count_++;
+        if (it->opClass() == FMAAccOp) {
+            wb_width++;
+        }
+        if (count_ >= wbWidth ||
+            wb_width >= wbWidth * 2) {
+            break;
+        }
+    }
+
+
+    for (int inst_num = 0; inst_num < wb_width &&
              toCommit->insts[inst_num]; inst_num++) {
         DynInstPtr inst = toCommit->insts[inst_num];
         ThreadID tid = inst->threadNumber;

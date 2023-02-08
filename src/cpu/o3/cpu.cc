@@ -40,6 +40,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "arch/riscv/regs/misc.hh"
 #include "cpu/o3/cpu.hh"
 
 #include "arch/riscv/regs/misc.hh"
@@ -53,6 +54,7 @@
 #include "cpu/simple_thread.hh"
 #include "cpu/thread_context.hh"
 #include "debug/Activity.hh"
+#include "debug/Commit.hh"
 #include "debug/Drain.hh"
 #include "debug/O3CPU.hh"
 #include "debug/Quiesce.hh"
@@ -88,7 +90,7 @@ CPU::CPU(const BaseO3CPUParams &params)
       decode(this, params),
       rename(this, params),
       iew(this, params),
-      commit(this, params),
+      commit(this, fetch.getBp(), params),
 
       regFile(params.numPhysIntRegs,
               params.numPhysFloatRegs,
@@ -497,6 +499,7 @@ CPU::tick()
             lastRunningCycle = curCycle();
             cpuStats.timesIdled++;
         } else {
+            lastRunningCycle = curCycle();
             schedule(tickEvent, clockEdge(Cycles(1)));
             DPRINTF(O3CPU, "Scheduling next tick!\n");
         }
@@ -1257,7 +1260,6 @@ CPU::instDone(ThreadID tid, const DynInstPtr &inst)
             Stats::schedStatEvent(true, true, curTick(), 0);
             scheduleInstStop(tid,0,"Will trigger stat dump and reset");
         }
-
     }
 
     thread[tid]->numOp++;
@@ -1613,6 +1615,8 @@ CPU::readArchIntReg(int reg_idx, ThreadID tid)
     PhysRegIdPtr phys_reg =
         commitRenameMap[tid].lookup(RegId(IntRegClass, reg_idx));
 
+    DPRINTF(Commit, "Get map: x%i -> p%i\n", reg_idx, phys_reg->flatIndex());
+
     return regFile.getReg(phys_reg);
 }
 
@@ -1622,6 +1626,7 @@ CPU::readArchFloatReg(int reg_idx, ThreadID tid)
     cpuStats.fpRegfileReads++;
     PhysRegIdPtr phys_reg =
         commitRenameMap[tid].lookup(RegId(FloatRegClass, reg_idx));
+    DPRINTF(Commit, "Get map: f%i -> p%i\n", reg_idx, phys_reg->flatIndex());
 
     return regFile.getReg(phys_reg);
 }
