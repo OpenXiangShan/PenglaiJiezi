@@ -914,12 +914,7 @@ BaseCPU::diffWithNEMU(ThreadID tid, InstSeqNum seq)
     DPRINTF(Diff, "Inst [sn:%llu] @ %#lx in GEM5 is %s\n", seq,
             diffInfo.pc->instAddr(),
             diffInfo.inst->disassemble(diffInfo.pc->instAddr()));
-<<<<<<< HEAD
-    auto machInst = dynamic_cast<RiscvISA::RiscvStaticInst &> \
-                (*diffInfo.inst).machInst;
-=======
     auto machInst = dynamic_cast<RiscvISA::RiscvStaticInst &>(*diffInfo.inst).machInst;
->>>>>>> ab757e79f24cce6b9921dd864ab73a8dcfb0351a
     DPRINTF(Diff, "MachInst: %#lx\n", machInst);
     if (diffInfo.inst->numDestRegs() > 0) {
         const auto &dest = diffInfo.inst->destRegIdx(0);
@@ -965,18 +960,9 @@ BaseCPU::diffWithNEMU(ThreadID tid, InstSeqNum seq)
                     for (auto iter : skipCSRs) {
                         if ((machInst & 0xfff00073) == iter) {
                             skipCSR = true;
-<<<<<<< HEAD
-                            DPRINTF(Diff, "This is an csr instruction,"
-                                        " skip!\n");
-                            diffAllStates->referenceRegFile[dest_tag]
-                                         = gem5_val;
-                            diffAllStates->proxy->regcpy(
-                                diffAllStates->referenceRegFile, DUT_TO_REF);
-=======
                             DPRINTF(Diff, "This is an csr instruction, skip!\n");
                             diffAllStates->referenceRegFile[dest_tag] = gem5_val;
                             diffAllStates->proxy->regcpy(diffAllStates->referenceRegFile, DUT_TO_REF);
->>>>>>> ab757e79f24cce6b9921dd864ab73a8dcfb0351a
                             break;
                         }
                     }
@@ -1129,23 +1115,12 @@ BaseCPU::difftestStep(ThreadID tid, InstSeqNum seq)
         }
     }
     committedInstNum++;
-<<<<<<< HEAD
-    bool dumpFlag = false;
-    if (dumpFlag && committedInstNum >= 37164) {
-        committedInsts.push_back(std::make_pair(
-                diffInfo.pc->instAddr(),
-                diffInfo.inst->disassemble(diffInfo.pc->instAddr()).c_str()));
-    }
-    DPRINTF(Diff, "commit_pc: %s, committedInstNum:"
-                " %d\n", diffInfo.pc, committedInstNum);
-=======
     if (dumpCommitFlag && committedInstNum >= dumpStartNum) {
         committedInsts.push_back(std::make_pair(
             diffInfo.pc->instAddr(),
             diffInfo.inst->disassemble(diffInfo.pc->instAddr()).c_str()));
     }
     DPRINTF(Diff, "commit_pc: %s, committedInstNum: %d\n", diffInfo.pc, committedInstNum);
->>>>>>> ab757e79f24cce6b9921dd864ab73a8dcfb0351a
 }
 
 void
