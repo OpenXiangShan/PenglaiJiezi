@@ -206,8 +206,8 @@ class DecoupledStreamBPU : public BPredUnit
 
     StreamUBTB *streamUBTB{};
 
-    std::array<TimedStreamPredictor*, 4> components{};
-    std::array<StreamPrediction, 4> componentPreds{};
+    std::array<TimedStreamPredictor*, 4> components;
+    std::array<StreamPrediction, 4> componentPreds;
     unsigned numComponents{};
 
     bool sentPCHist{false};

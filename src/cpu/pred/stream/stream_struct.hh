@@ -1,6 +1,8 @@
 #ifndef __CPU_PRED_STREAM_STRUCT_HH__
 #define __CPU_PRED_STREAM_STRUCT_HH__
 
+#include <list>
+
 #include <boost/dynamic_bitset.hpp>
 
 #include "base/types.hh"
