@@ -103,7 +103,7 @@ class BaseCache(ClockedObject):
         "Notify the hardware prefetcher on hit on prefetched lines")
 
     tags = Param.BaseTags(BaseSetAssoc(), "Tag store")
-    replacement_policy = Param.BaseReplacementPolicy(LRURP(),
+    replacement_policy = Param.BaseReplacementPolicy(TreePLRURP(),
         "Replacement policy")
 
     compressor = Param.BaseCacheCompressor(NULL, "Cache compressor.")
