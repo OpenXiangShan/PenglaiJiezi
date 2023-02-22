@@ -103,6 +103,9 @@ class L3Cache(Cache):
     tag_latency = 2
     data_latency = 17
     sequential_access = True
+    #replacement_policy = Param.BaseReplacementPolicy(LRURP(),
+    #    "Replacement policy")
+    replacement_policy = LRURP()
 
     # This is L3 miss latency, which act as padding for memory controller
     response_latency = 112
