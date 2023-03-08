@@ -90,7 +90,7 @@ Trace::ExeTracerRecord::traceInst(const StaticInstPtr &inst, bool ran)
     }
 
     if (inst->isMicroop()) {
-        ccprintf(outs, ".%2d", pc->microPC());
+        ccprintf(outs, ".%2d\t", pc->microPC());
     } else {
         ccprintf(outs, "   ");
     }

@@ -15,5 +15,6 @@
 #define RL      bits(machInst, 25)
 #define RS1     bits(machInst, 19, 15)
 #define RS2     bits(machInst, 24, 20)
+#define RS3     bits(machInst, 31, 27)
 
 #endif // __ARCH_RISCV_BITFIELDS_HH__

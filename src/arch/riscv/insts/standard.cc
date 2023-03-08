@@ -60,11 +60,19 @@ RegOp::generateDisassembly(Addr pc, const loader::SymbolTable *symtab) const
 std::string
 FMAMOp::generateDisassembly(Addr pc, const loader::SymbolTable *symtab) const
 {
-    assert(_numSrcRegs == 3);
     std::stringstream ss;
-    ss << mnemonic << ' ' << registerName(destRegIdx(0)) << ", "
-       << registerName(srcRegIdx(0)) << ", " << registerName(srcRegIdx(1))
-       << ", " << registerName(srcRegIdx(2));
+    ss << mnemonic;
+    ss << ' ' << registerName(RegId(IntRegClass, RD)) << ", "
+              << registerName(RegId(IntRegClass, RS1)) <<", "
+              << registerName(RegId(IntRegClass, RS2)) <<", "
+              << registerName(RegId(IntRegClass, RS3)) <<" : macroOp";
+
+
+    //ss << "_numSrcRegs: " <<_numSrcRegs<<", ";
+    // ss << mnemonic << ' ' << registerName(destRegIdx(0)) << ", "
+    //    << registerName(srcRegIdx(0)) << ", " << registerName(srcRegIdx(1))
+    //    << ", " << registerName(srcRegIdx(2));
+    //assert(_numSrcRegs == 3);
     return ss.str();
 }
 

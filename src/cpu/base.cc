@@ -1045,6 +1045,9 @@ BaseCPU::diffWithNEMU(ThreadID tid, InstSeqNum seq)
                 if (diffInfo.inst->isLoad()) {
                     warn("Load addr: %#lx\n", diffInfo.physEffAddr);
                 }
+                else if (diffInfo.inst->isStore()) {
+                    warn("Store addr: %#lx\n", diffInfo.physEffAddr);
+                }
             }
         }
     }
