@@ -57,12 +57,17 @@ typedef struct BranchInfo {
         isCond(static_inst->isCondCtrl()),
         isIndirect(static_inst->isIndirectCtrl()),
         isCall(static_inst->isCall()),
-        isReturn(static_inst->isReturn()),
+        isReturn(static_inst->isReturn() &&
+            !static_inst->isNonSpeculative() && !static_inst->isDirectCtrl()),
         size(size) {}
     int getType() {
         if (isCond) {
             return 0;
         } else if (!isIndirect) {
+            if (isReturn) {
+                fatal("jal return detected!\n");
+                return 7;
+            }
             if (!isCall) {
                 return 1;
             } else {
@@ -107,6 +112,7 @@ typedef struct FTBSlot : BranchInfo
 {
     bool valid;
     bool alwaysTaken;
+    int ctr;
     bool uncondValid() { return this->isUncond() && this->valid; }
     bool condValid() { return this->isCond && this->valid;}
     FTBSlot() : valid(false) {}
@@ -172,7 +178,7 @@ typedef struct FTBEntry
 
     // check if the entry is reasonable with given startPC
     // every branch slot and fallThru should be in the range of (startPC, startPC+34]
-    // every 
+    // every
     bool isReasonable(Addr start) {
         Addr min = start;
         Addr max = start+34;
@@ -360,7 +366,7 @@ typedef struct FullFTBPrediction
             } else {
                 target = ftbEntry.fallThruAddr;
             }
-            
+
         } else {
             target = bbStart + 32; //TODO: +predictWidth
         }
@@ -466,7 +472,7 @@ struct FtqEntry
         , taken(false)
         , target(0)
         , fsqID(0) {}
-    
+
     bool miss() const { return !taken; }
     // bool filledUp() const { return (endPC & fetchTargetMask) == 0; }
     // unsigned predLoopIteration;
@@ -475,7 +481,8 @@ struct FtqEntry
 
 struct BpTrace : public Record {
     void set(uint64_t startPC, uint64_t controlPC, uint64_t controlType,
-        uint64_t taken, uint64_t mispred, uint64_t fallThruPC, uint64_t source) {
+        uint64_t taken, uint64_t mispred, uint64_t fallThruPC,
+        uint64_t source, uint64_t target) {
         _uint64_data["startPC"] = startPC;
         _uint64_data["controlPC"] = controlPC;
         _uint64_data["controlType"] = controlType;
@@ -483,12 +490,17 @@ struct BpTrace : public Record {
         _uint64_data["mispred"] = mispred;
         _uint64_data["fallThruPC"] = fallThruPC;
         _uint64_data["source"] = source;
+        _uint64_data["target"] = target;
     }
     BpTrace(FetchStream &stream) {
         _tick = curTick();
-        set(stream.startPC, stream.exeBranchInfo.pc, stream.exeBranchInfo.getType(),
-            stream.exeTaken, stream.squashType == SQUASH_CTRL, stream.updateFTBEntry.fallThruAddr, stream.predSource);
-        // for (auto it = _uint64_data.begin(); it != _uint64_data.end(); it++) {
+        set(stream.startPC, stream.exeBranchInfo.pc,
+            stream.exeBranchInfo.getType(),
+            stream.exeTaken, stream.squashType == SQUASH_CTRL,
+            stream.updateFTBEntry.fallThruAddr,
+            stream.predSource, stream.exeBranchInfo.target);
+        // for (auto it = _uint64_data.begin();
+        //      it != _uint64_data.end(); it++) {
         //     printf("%s: %ld\n", it->first.c_str(), it->second);
         // }
     }

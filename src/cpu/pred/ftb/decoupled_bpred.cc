@@ -42,7 +42,8 @@ DecoupledBPUWithFTB::DecoupledBPUWithFTB(const DecoupledBPUWithFTBParams &p)
             std::make_pair("taken", UINT64),
             std::make_pair("mispred", UINT64),
             std::make_pair("fallThruPC", UINT64),
-            std::make_pair("source", UINT64)
+            std::make_pair("source", UINT64),
+            std::make_pair("target", UINT64)
         };
         bptrace = bpdb.addAndGetTrace("BPTRACE", fields_vec);
         bptrace->init_table();
@@ -97,9 +98,11 @@ DecoupledBPUWithFTB::DecoupledBPUWithFTB(const DecoupledBPUWithFTBParams &p)
         simout.close(out_handle);
 
         out_handle = simout.create("topMisPredictHist.txt", false, true);
-        // *out_handle->stream() << "use loop but invalid: " << useLoopButInvalid 
-        //                       << " use loop and valid: " << useLoopAndValid 
-        //                       << " not use loop: " << notUseLoop << std::endl;
+        // *out_handle->stream() << "use loop but invalid: "
+        //                       << useLoopButInvalid
+        //                       << " use loop and valid: " << useLoopAndValid
+        //                       << " not use loop: "
+        //                       << notUseLoop << std::endl;
         *out_handle->stream() << "Hist" << " " << "count" << std::endl;
         std::vector<std::pair<uint64_t, uint64_t>> topMisPredHistVec;
         for (const auto &entry: topMispredHist) {
@@ -166,23 +169,48 @@ DecoupledBPUWithFTB::DecoupledBPUWithFTB(const DecoupledBPUWithFTBParams &p)
 
 DecoupledBPUWithFTB::DBPFTBStats::DBPFTBStats(statistics::Group* parent, unsigned numStages, unsigned fsqSize):
     statistics::Group(parent),
-    ADD_STAT(condMiss, statistics::units::Count::get(), "the number of cond branch misses"),
-    ADD_STAT(uncondMiss, statistics::units::Count::get(), "the number of uncond branch misses"),
-    ADD_STAT(returnMiss, statistics::units::Count::get(), "the number of return branch misses"),
-    ADD_STAT(otherMiss, statistics::units::Count::get(), "the number of other branch misses"),
-    ADD_STAT(predsOfEachStage, statistics::units::Count::get(), "the number of preds of each stage that account for final pred"),
-    ADD_STAT(commitPredsFromEachStage, statistics::units::Count::get(), "the number of preds of each stage that account for a committed stream"),
-    ADD_STAT(fsqEntryDist, statistics::units::Count::get(), "the distribution of number of entries in fsq"),
-    ADD_STAT(controlSquash, statistics::units::Count::get(), "the number of control squashes in bpu"),
-    ADD_STAT(nonControlSquash, statistics::units::Count::get(), "the number of non-control squashes in bpu"),
-    ADD_STAT(trapSquash, statistics::units::Count::get(), "the number of trap squashes in bpu"),
-    ADD_STAT(ftqNotValid, statistics::units::Count::get(), "fetch needs ftq req but ftq not valid"),
-    ADD_STAT(fsqNotValid, statistics::units::Count::get(), "ftq needs fsq req but fsq not valid"),
-    ADD_STAT(fsqFullCannotEnq, statistics::units::Count::get(), "bpu has req but fsq full cannot enqueue"),
-    ADD_STAT(ftbHit, statistics::units::Count::get(), "ftb hits (in predict block)"),
-    ADD_STAT(ftbMiss, statistics::units::Count::get(), "ftb misses (in predict block)"),
-    ADD_STAT(predFalseHit, statistics::units::Count::get(), "false hit detected at pred"),
-    ADD_STAT(commitFalseHit, statistics::units::Count::get(), "false hit detected at commit")
+    ADD_STAT(condNum, statistics::units::Count::get(),
+            "the number of cond branches"),
+    ADD_STAT(uncondNum, statistics::units::Count::get(),
+             "the number of uncond branches"),
+    ADD_STAT(returnNum, statistics::units::Count::get(),
+            "the number of return branches"),
+    ADD_STAT(otherNum, statistics::units::Count::get(),
+            "the number of other branches"),
+    ADD_STAT(condMiss, statistics::units::Count::get(),
+            "the number of cond branch misses"),
+    ADD_STAT(uncondMiss, statistics::units::Count::get(),
+            "the number of uncond branch misses"),
+    ADD_STAT(returnMiss, statistics::units::Count::get(),
+            "the number of return branch misses"),
+    ADD_STAT(otherMiss, statistics::units::Count::get(),
+            "the number of other branch misses"),
+    ADD_STAT(predsOfEachStage, statistics::units::Count::get(),
+        "the number of preds of each stage that account for final pred"),
+    ADD_STAT(commitPredsFromEachStage, statistics::units::Count::get(),
+    "the number of preds of each stage that account for a committed stream"),
+    ADD_STAT(fsqEntryDist, statistics::units::Count::get(),
+            "the distribution of number of entries in fsq"),
+    ADD_STAT(controlSquash, statistics::units::Count::get(),
+            "the number of control squashes in bpu"),
+    ADD_STAT(nonControlSquash, statistics::units::Count::get(),
+            "the number of non-control squashes in bpu"),
+    ADD_STAT(trapSquash, statistics::units::Count::get(),
+            "the number of trap squashes in bpu"),
+    ADD_STAT(ftqNotValid, statistics::units::Count::get(),
+            "fetch needs ftq req but ftq not valid"),
+    ADD_STAT(fsqNotValid, statistics::units::Count::get(),
+            "ftq needs fsq req but fsq not valid"),
+    ADD_STAT(fsqFullCannotEnq, statistics::units::Count::get(),
+            "bpu has req but fsq full cannot enqueue"),
+    ADD_STAT(ftbHit, statistics::units::Count::get(),
+            "ftb hits (in predict block)"),
+    ADD_STAT(ftbMiss, statistics::units::Count::get(),
+            "ftb misses (in predict block)"),
+    ADD_STAT(predFalseHit, statistics::units::Count::get(),
+            "false hit detected at pred"),
+    ADD_STAT(commitFalseHit, statistics::units::Count::get(),
+            "false hit detected at commit")
 {
     predsOfEachStage.init(numStages);
     commitPredsFromEachStage.init(numStages);
@@ -220,9 +248,11 @@ DecoupledBPUWithFTB::tick()
     if (!receivedPred && !streamQueueFull()) {
         if (s0PC == ObservingPC) {
             DPRINTFV(true, "Predicting block %#lx, id: %lu\n", s0PC, fsqId);
-        }   
-        DPRINTF(DecoupleBP, "Requesting prediction for stream start=%#lx\n", s0PC);
-        DPRINTF(Override, "Requesting prediction for stream start=%#lx\n", s0PC);
+        }
+        DPRINTF(DecoupleBP, "Requesting prediction for stream start=%#lx\n",
+                        s0PC);
+        DPRINTF(Override, "Requesting prediction for stream start=%#lx\n",
+                        s0PC);
         // put startAddr in preds
         for (int i = 0; i < numStages; i++) {
             predsOfEachStage[i].bbStart = s0PC;
@@ -237,7 +267,7 @@ DecoupledBPUWithFTB::tick()
     for (int i = 0; i < numStages; i++) {
         printFullFTBPrediction(predsOfEachStage[i]);
     }
-    
+
     if (streamQueueFull()) {
         DPRINTF(DecoupleBP, "Stream queue is full, don't request prediction\n");
         DPRINTF(Override, "Stream queue is full, don't request prediction\n");
@@ -439,7 +469,7 @@ DecoupledBPUWithFTB::controlSquash(unsigned target_id, unsigned stream_id,
     DPRINTF(DecoupleBPHist,
              "Recover history %s\nto %s\n", s0History, stream.history);
     s0History = stream.history;
-    
+
     // recover history info
     int real_shamt;
     bool real_taken;
@@ -448,7 +478,8 @@ DecoupledBPUWithFTB::controlSquash(unsigned target_id, unsigned stream_id,
         components[i]->recoverHist(s0History, stream, real_shamt, real_taken);
     }
     histShiftIn(real_shamt, real_taken, s0History);
-    historyManager.squash(stream_id, real_shamt, real_taken);
+    historyManager.squash(stream_id,
+                real_shamt, real_taken, stream.exeBranchInfo);
     checkHistory(s0History);
     tage->checkFoldedHist(s0History, "control squash");
 
@@ -457,7 +488,7 @@ DecoupledBPUWithFTB::controlSquash(unsigned target_id, unsigned stream_id,
 
     printStream(stream);
 
-    
+
     // inc stream id because current stream ends
     // now stream always ends
     ftq_demand_stream_id = stream_id + 1;
@@ -501,9 +532,15 @@ DecoupledBPUWithFTB::nonControlSquash(unsigned target_id, unsigned stream_id,
 
     squashStreamAfter(stream_id);
 
+    auto &stream = it->second;
+
+    stream.exeTaken = false;
+    stream.resolved = true;
+    stream.squashPC = inst_pc.instAddr();
+    stream.squashType = SQUASH_OTHER;
+
     // recover history info
     s0History = it->second.history;
-    auto &stream = it->second;
     int real_shamt;
     bool real_taken;
     std::tie(real_shamt, real_taken) = stream.getHistInfoDuringSquash(inst_pc.instAddr(), false, false, numBr);
@@ -511,17 +548,12 @@ DecoupledBPUWithFTB::nonControlSquash(unsigned target_id, unsigned stream_id,
         components[i]->recoverHist(s0History, stream, real_shamt, real_taken);
     }
     histShiftIn(real_shamt, real_taken, s0History);
-    historyManager.squash(stream_id, real_shamt, real_taken);
+    historyManager.squash(stream_id, real_shamt, real_taken, BranchInfo());
     checkHistory(s0History);
     tage->checkFoldedHist(s0History, "non control squash");
     // fetching from a new fsq entry
     auto pc = inst_pc.instAddr();
     fetchTargetQueue.squash(target_id + 1, ftq_demand_stream_id + 1, pc);
-
-    stream.exeTaken = false;
-    stream.resolved = true;
-    stream.squashPC = inst_pc.instAddr();
-    stream.squashType = SQUASH_OTHER;
 
     s0PC = pc;
     fsqId = stream_id + 1;
@@ -553,6 +585,13 @@ DecoupledBPUWithFTB::trapSquash(unsigned target_id, unsigned stream_id,
     assert(it != fetchStreamQueue.end());
     auto &stream = it->second;
 
+    stream.resolved = true;
+    stream.exeTaken = false;
+    stream.squashPC = inst_pc.instAddr();
+    stream.squashType = SQUASH_TRAP;
+
+    squashStreamAfter(stream_id);
+
     // recover history info
     s0History = stream.history;
     int real_shamt;
@@ -562,16 +601,9 @@ DecoupledBPUWithFTB::trapSquash(unsigned target_id, unsigned stream_id,
         components[i]->recoverHist(s0History, stream, real_shamt, real_taken);
     }
     histShiftIn(real_shamt, real_taken, s0History);
-    historyManager.squash(stream_id, real_shamt, real_taken);
+    historyManager.squash(stream_id, real_shamt, real_taken, BranchInfo());
     checkHistory(s0History);
     tage->checkFoldedHist(s0History, "trap squash");
-
-    stream.resolved = true;
-    stream.exeTaken = false;
-    stream.squashPC = inst_pc.instAddr();
-    stream.squashType = SQUASH_TRAP;
-
-    squashStreamAfter(stream_id);
 
     // inc stream id because current stream is disturbed
     auto ftq_demand_stream_id = stream_id + 1;
@@ -624,7 +656,7 @@ void DecoupledBPUWithFTB::update(unsigned stream_id, ThreadID tid)
                 stream.startPC, miss_predicted ? "miss" : "correctly",
                 stream.exeBranchInfo.pc, stream.exeBranchInfo.target,
                 stream.predBranchInfo.pc, stream.predBranchInfo.target);
-        
+
         if (stream.isHit) {
             dbpFtbStats.ftbHit++;
         } else {
@@ -815,15 +847,16 @@ DecoupledBPUWithFTB::tryEnqFetchTarget()
     DPRINTF(DecoupleBP, "Serve enq PC: %#lx with stream %lu:\n",
             ftq_enq_state.pc, it->first);
     printStream(stream_to_enq);
-    
+
 
     // We does let ftq to goes beyond fsq now
     if (ftq_enq_state.pc > end) {
         warn("FTQ enq PC %#lx is beyond fsq end %#lx\n",
          ftq_enq_state.pc, end);
     }
-    
-    assert(ftq_enq_state.pc <= end || (end < 0x20 && (ftq_enq_state.pc + 0x20 < 0x20)));
+
+    assert(ftq_enq_state.pc <= end ||
+                (end < 0x20 && (ftq_enq_state.pc + 0x20 < 0x20)));
 
     // create a new target entry
     FtqEntry ftq_entry;
@@ -931,10 +964,11 @@ DecoupledBPUWithFTB::makeNewPrediction(bool create_new_stream)
     histShiftIn(shamt, taken, s0History);
     boost::to_string(s0History, buf2);
 
-    historyManager.addSpeculativeHist(entry.startPC, shamt, taken, fsqId);
+    historyManager.addSpeculativeHist(entry.startPC,
+                shamt, taken, entry.predBranchInfo, fsqId);
     tage->checkFoldedHist(s0History, "speculative update");
 
-    
+
     entry.setDefaultResolve();
     auto [insert_it, inserted] = fetchStreamQueue.emplace(fsqId, entry);
     assert(inserted);
@@ -951,15 +985,30 @@ DecoupledBPUWithFTB::checkHistory(const boost::dynamic_bitset<> &history)
 {
     unsigned ideal_size = 0;
     boost::dynamic_bitset<> ideal_hash_hist(historyBits, 0);
+    int ideal_sp = ras->getNonSpecSp();
+    std::vector<RAS::RASEntry> ideal_stack(ras->getNonSpecStack());
     for (const auto entry: historyManager.getSpeculativeHist()) {
-        if (entry.shamt == 0) {
+        if (entry.shamt == 0 && !entry.is_call && !entry.is_return) {
             continue;
         }
-        ideal_size += entry.shamt;
-        DPRINTF(DecoupleBPVerbose, "pc: %#lx, shamt: %d, cond_taken: %d\n", entry.pc,
-                entry.shamt, entry.cond_taken);
-        ideal_hash_hist <<= entry.shamt;
-        ideal_hash_hist[0] = entry.cond_taken;
+        if (entry.shamt != 0) {
+            ideal_size += entry.shamt;
+            DPRINTF(DecoupleBPVerbose, "pc: %#lx, shamt: %d, cond_taken: %d\n",
+                    entry.pc, entry.shamt, entry.cond_taken);
+            ideal_hash_hist <<= entry.shamt;
+            ideal_hash_hist[0] = entry.cond_taken;
+        }
+        if (entry.is_call || entry.is_return) {
+            DPRINTF(DecoupleBPVerbose, "pc: %#lx, is_call: %d,"
+                        " is_return: %d, retAddr: %#lx\n",
+                entry.pc, entry.is_call, entry.is_return, entry.retAddr);
+            if (entry.is_call) {
+                ras->push(entry.retAddr, ideal_stack, ideal_sp);
+            }
+            if (entry.is_return) {
+                ras->pop(ideal_stack, ideal_sp);
+            }
+        }
     }
     unsigned comparable_size = std::min(ideal_size, historyBits);
     boost::dynamic_bitset<> sized_real_hist(history);
@@ -973,7 +1022,10 @@ DecoupledBPUWithFTB::checkHistory(const boost::dynamic_bitset<> &history)
             ideal_size, historyBits, comparable_size);
     DPRINTF(DecoupleBP, "Ideal history:\t%s\nreal history:\t%s\n",
             buf1.c_str(), buf2.c_str());
+    int sp = ras->getSp();
+    DPRINTF(DecoupleBP, "ideal sp:\t%d, real sp:\t%d\n", ideal_sp, sp);
     assert(ideal_hash_hist == sized_real_hist);
+    // assert(ideal_sp == sp);
 }
 
 void

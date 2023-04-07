@@ -17,7 +17,7 @@ namespace ftb_pred {
 class RAS : public TimedBaseFTBPredictor
 {
     public:
-    
+
         typedef RASParams Params;
         RAS(const Params &p);
 
@@ -37,7 +37,7 @@ class RAS : public TimedBaseFTBPredictor
 
         void putPCHistory(Addr startAddr, const boost::dynamic_bitset<> &history,
                           std::vector<FullFTBPrediction> &stagePreds) override;
-        
+
         std::shared_ptr<void> getPredictionMeta() override;
 
         void specUpdateHist(const boost::dynamic_bitset<> &history, FullFTBPrediction &pred) override;
@@ -46,17 +46,45 @@ class RAS : public TimedBaseFTBPredictor
 
         void recoverHist(const boost::dynamic_bitset<> &history, const FetchStream &entry, int shamt, bool cond_taken) override;
 
+        void update(const FetchStream &entry) override;
+
+        int getSp() {return specSp;}
+
+        int getNumEntries() {return numEntries;}
+
+        int getMaxCtr() {return maxCtr;}
+
+        std::vector<RASEntry> getNonSpecStack() {return nonSpecStack;}
+
+        int getNonSpecSp() {return nonSpecSp;}
+
+        enum When
+        {
+            SPECULATIVE,
+            REDIRECT,
+            COMMIT
+        };
+
+        enum RAS_OP
+        {
+            PUSH,
+            POP,
+            RECOVER
+            // PUSH_AND_POP
+        };
+
+        void push(Addr retAddr, std::vector<RASEntry> &stack, int &sp);
+
+        void pop(std::vector<RASEntry> &stack, int &sp);
+
     private:
-
-        void push(Addr retAddr);
-
-        void pop();
 
         void ptrInc(int &ptr);
 
         void ptrDec(int &ptr);
 
-        void printStack(const char *when) {
+        void printStack(const char *when,
+                std::vector<RASEntry> &stack, int &sp) {
             DPRINTF(FTBRAS, "printStack when %s: \n", when);
             for (int i = 0; i < numEntries; i++) {
                 DPRINTFR(FTBRAS, "entry [%d], retAddr %#lx, ctr %d", i, stack[i].retAddr, stack[i].ctr);
@@ -67,19 +95,65 @@ class RAS : public TimedBaseFTBPredictor
             }
         }
 
+        void setTrace() override;
+
         unsigned numEntries;
 
         unsigned ctrWidth;
 
         int maxCtr;
 
-        int sp;
+        int specSp;
 
-        std::vector<RASEntry> stack;
+        int nonSpecSp;
+
+        std::vector<RASEntry> specStack;
+
+        std::vector<RASEntry> nonSpecStack;
 
         RASMeta meta;
 
+        TraceManager *specRasTrace;
+        TraceManager *nonSpecRasTrace;
 
+};
+
+struct SpecRASTrace : public Record
+{
+    SpecRASTrace(RAS::When when, RAS::RAS_OP op, Addr startPC, Addr brPC,
+        Addr retAddr, int sp, Addr tosAddr, unsigned tosCtr)
+    {
+        _tick = curTick();
+        _uint64_data["condition"] = when;
+        _uint64_data["op"] = op;
+        _uint64_data["startPC"] = startPC;
+        _uint64_data["brPC"] = brPC;
+        _uint64_data["retAddr"] = retAddr;
+        _uint64_data["sp"] = sp;
+        _uint64_data["tosAddr"] = tosAddr;
+        _uint64_data["tosCtr"] = tosCtr;
+    }
+};
+
+struct NonSpecRASTrace : public Record
+{
+    NonSpecRASTrace(RAS::RAS_OP op, Addr startPC, Addr brPC, Addr retAddr,
+        int predSp, Addr predTosAddr, unsigned predTosCtr,
+        int sp, Addr tosAddr, unsigned tosCtr, bool miss)
+    {
+        _tick = curTick();
+        _uint64_data["op"] = op;
+        _uint64_data["startPC"] = startPC;
+        _uint64_data["brPC"] = brPC;
+        _uint64_data["retAddr"] = retAddr;
+        _uint64_data["predSp"] = predSp;
+        _uint64_data["predTosAddr"] = predTosAddr;
+        _uint64_data["predTosCtr"] = predTosCtr;
+        _uint64_data["sp"] = sp;
+        _uint64_data["tosAddr"] = tosAddr;
+        _uint64_data["tosCtr"] = tosCtr;
+        _uint64_data["miss"] = miss;
+    }
 };
 
 }  // namespace ftb_pred
