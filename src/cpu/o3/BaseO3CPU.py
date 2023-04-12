@@ -126,7 +126,9 @@ class BaseO3CPU(BaseCPU):
             "Time buffer size for forward communication")
 
     LQEntries = Param.Unsigned(80, "Number of load queue entries")
-    SQEntries = Param.Unsigned(64, "Number of store queue entries")
+    SQEntries = Param.Unsigned(192, "Number of store queue entries,"
+                               "store queue size 64 + "
+                               "store buffer 16*8 ")
     LSQDepCheckShift = Param.Unsigned(0,
             "Number of places to shift addr before check")
     LSQCheckLoads = Param.Bool(True,
