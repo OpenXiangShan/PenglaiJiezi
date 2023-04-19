@@ -52,7 +52,7 @@
 #include "base/compiler.hh"
 #include "base/loader/symtab.hh"
 #include "base/logging.hh"
-#include "arch/riscv/insts/static_inst.hh"
+#include "base/output.hh"
 #include "config/the_isa.hh"
 #include "cpu/base.hh"
 #include "cpu/checker/cpu.hh"
@@ -66,20 +66,19 @@
 #include "debug/Commit.hh"
 #include "debug/CommitRate.hh"
 #include "debug/CommitTrace.hh"
+#include "debug/Counters.hh"
 #include "debug/Diff.hh"
 #include "debug/Drain.hh"
 #include "debug/ExecFaulting.hh"
+#include "debug/FTBStats.hh"
 #include "debug/Faults.hh"
 #include "debug/HtmCpu.hh"
 #include "debug/InstCommited.hh"
 #include "debug/O3PipeView.hh"
-#include "debug/Faults.hh"
-#include "debug/FTBStats.hh"
 #include "params/BaseO3CPU.hh"
+#include "sim/core.hh"
 #include "sim/faults.hh"
 #include "sim/full_system.hh"
-#include "sim/core.hh"
-#include "base/output.hh"
 
 namespace gem5
 {
@@ -725,6 +724,9 @@ Commit::tick()
             DPRINTF(Commit,"[tid:%i] Can't commit, Instruction [sn:%llu] PC "
                     "%s is head of ROB and not ready\n",
                     tid, inst->seqNum, inst->pcState());
+            DPRINTF(Counters, "instruction ready tick:%lu\n", inst->readyTick);
+            DPRINTF(Commit, "%s\n", inst->staticInst->disassemble(
+                        inst->pcState().instAddr()).c_str());
         }
 
         DPRINTF(Commit, "[tid:%i] ROB has %d insts & %d free entries.\n",
@@ -1103,6 +1105,15 @@ Commit::commitInsts()
                     auto dbftb = dynamic_cast<branch_prediction::\
                                     ftb_pred::DecoupledBPUWithFTB*>(bp);
                     bool miss = head_inst->mispredicted();
+                    if (head_inst->isReturn()) {
+                        DPRINTF(FTBRAS, "commit inst PC %x miss %d"
+                            " real target %x pred target %x\n",
+                                head_inst->pcState().instAddr(),
+                                miss,
+                                head_inst->pcState().clone()->as<\
+                                    RiscvISA::PCState>().npc(),
+                                *(head_inst->predPC));
+                    }
                     // FIXME: ignore mret/sret/uret in correspond with RTL
                     if (!head_inst->isNonSpeculative()) {
                         if (head_inst->isUncondCtrl()) {
@@ -1116,6 +1127,7 @@ Commit::commitInsts()
                         if (head_inst->isReturn()) {
                             dbftb->addCfi(branch_prediction::ftb_pred::\
                                 DecoupledBPUWithFTB::CfiType::RETURN, miss);
+
                         } else if (head_inst->isIndirectCtrl()) {
                             dbftb->addCfi(branch_prediction::ftb_pred::\
                                 DecoupledBPUWithFTB::CfiType::OTHER, miss);

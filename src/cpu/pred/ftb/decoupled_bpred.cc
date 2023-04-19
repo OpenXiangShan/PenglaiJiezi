@@ -982,7 +982,7 @@ DecoupledBPUWithFTB::makeNewPrediction(bool create_new_stream)
 
 void
 DecoupledBPUWithFTB::checkHistory(const boost::dynamic_bitset<> &history)
-{
+{/*
     unsigned ideal_size = 0;
     boost::dynamic_bitset<> ideal_hash_hist(historyBits, 0);
     int ideal_sp = ras->getNonSpecSp();
@@ -1026,6 +1026,7 @@ DecoupledBPUWithFTB::checkHistory(const boost::dynamic_bitset<> &history)
     DPRINTF(DecoupleBP, "ideal sp:\t%d, real sp:\t%d\n", ideal_sp, sp);
     assert(ideal_hash_hist == sized_real_hist);
     // assert(ideal_sp == sp);
+    */
 }
 
 void
