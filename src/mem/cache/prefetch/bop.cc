@@ -28,7 +28,7 @@
 
 #include "mem/cache/prefetch/bop.hh"
 
-#include "debug/BOPPrefetcher.hh"
+#include "debug/HWPrefetch.hh"
 #include "params/BOPPrefetcher.hh"
 
 namespace gem5
@@ -56,7 +56,7 @@ BOP::BOP(const BOPPrefetcherParams &p)
     if (!isPowerOf2(blkSize)) {
         fatal("%s: cache line size is not power of 2\n", name());
     }
-    if (p.negative_offsets_enable && !(p.offset_list_size % 2 == 0)) {
+    if (!(p.negative_offsets_enable && (p.offset_list_size % 2 == 0))) {
         fatal("%s: negative offsets enabled with odd offset list size\n",
               name());
     }
@@ -82,13 +82,11 @@ BOP::BOP(const BOPPrefetcherParams &p)
 
         if (offset == 1) {
             offsetsList.push_back(OffsetListEntry(offset_i, 0));
-            DPRINTF(BOPPrefetcher, "add %d to offset list\n", offset_i);
             i++;
             // If we want to use negative offsets, add also the negative value
             // of the offset just calculated
             if (p.negative_offsets_enable)  {
                 offsetsList.push_back(OffsetListEntry(-offset_i, 0));
-                DPRINTF(BOPPrefetcher, "add %d to offset list\n", -offset_i);
                 i++;
             }
         }
@@ -166,7 +164,7 @@ BOP::resetScores()
 inline Addr
 BOP::tag(Addr addr) const
 {
-    return (addr >> lBlkSize) & tagMask;
+    return (addr >> blkSize) & tagMask;
 }
 
 bool
@@ -192,16 +190,15 @@ BOP::bestOffsetLearning(Addr x)
 {
     Addr offset_addr = (*offsetsListIterator).first;
     Addr lookup_addr = x - offset_addr;
-    DPRINTF(BOPPrefetcher, "%s: offset: %d lookup addr: %#lx\n",
-            __FUNCTION__, offset_addr, lookup_addr);
+
     // There was a hit in the RR table, increment the score for this offset
     if (testRR(lookup_addr)) {
-        DPRINTF(BOPPrefetcher, "Address %#lx found in the RR table\n", x);
+        DPRINTF(HWPrefetch, "Address %#lx found in the RR table\n", x);
         (*offsetsListIterator).second++;
         if ((*offsetsListIterator).second > bestScore) {
             bestScore = (*offsetsListIterator).second;
             phaseBestOffset = (*offsetsListIterator).first;
-            DPRINTF(BOPPrefetcher, "New best score is %lu\n", bestScore);
+            DPRINTF(HWPrefetch, "New best score is %lu\n", bestScore);
         }
     }
 
@@ -217,8 +214,6 @@ BOP::bestOffsetLearning(Addr x)
         // (1) One of the scores equals SCORE_MAX
         // (2) The number of rounds equals ROUND_MAX
         if ((bestScore >= scoreMax) || (round == roundMax)) {
-            DPRINTF(BOPPrefetcher, "update new score: %d round: %d bop: %d\n",
-                    bestScore, round, bestOffset);
             bestOffset = phaseBestOffset;
             round = 0;
             bestScore = 0;
@@ -226,8 +221,7 @@ BOP::bestOffsetLearning(Addr x)
             resetScores();
             issuePrefetchRequests = true;
         } else if (bestScore <= badScore) {
-            DPRINTF(BOPPrefetcher, "best score %d <= bad score %d\n",
-                    bestScore, badScore);
+            issuePrefetchRequests = false;
         }
     }
 }
@@ -238,9 +232,6 @@ BOP::calculatePrefetch(const PrefetchInfo &pfi,
 {
     Addr addr = pfi.getAddr();
     Addr tag_x = tag(addr);
-
-    DPRINTF(BOPPrefetcher,
-            "Train prefetcher with addr %#lx tag %#lx\n", addr, tag_x);
 
     if (delayQueueEnabled) {
         insertIntoDelayQueue(tag_x);
@@ -257,11 +248,7 @@ BOP::calculatePrefetch(const PrefetchInfo &pfi,
     if (issuePrefetchRequests) {
         Addr prefetch_addr = addr + (bestOffset << lBlkSize);
         addresses.push_back(AddrPriority(prefetch_addr, 0));
-        DPRINTF(BOPPrefetcher,
-                "Generated prefetch %#lx offset: %d\n",
-                prefetch_addr, bestOffset);
-    } else {
-        DPRINTF(BOPPrefetcher, "Issue prefetch is false, can't issue\n");
+        DPRINTF(HWPrefetch, "Generated prefetch %#lx\n", prefetch_addr);
     }
 }
 
@@ -272,8 +259,6 @@ BOP::notifyFill(const PacketPtr& pkt)
     if (!pkt->cmd.isHWPrefetch()) return;
 
     Addr tag_y = tag(pkt->getAddr());
-    DPRINTF(BOPPrefetcher, "Notify fill, addr: %#lx tag: %#lx issuePf: %d\n",
-            pkt->getAddr(), tag(pkt->getAddr()), issuePrefetchRequests);
 
     if (issuePrefetchRequests) {
         insertIntoRR(tag_y - bestOffset, RRWay::Right);

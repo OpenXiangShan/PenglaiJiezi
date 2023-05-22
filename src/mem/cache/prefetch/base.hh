@@ -442,7 +442,7 @@ class Base : public ClockedObject
      * page crossing references and/or uses virtual addresses for training.
      * @param tlb pointer to the BaseTLB object to add
      */
-    virtual void addTLB(BaseTLB *tlb);
+    void addTLB(BaseTLB *tlb);
 };
 
 } // namespace prefetch

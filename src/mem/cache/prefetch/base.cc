@@ -301,7 +301,7 @@ Base::addEventProbe(SimObject *obj, const char *name)
 void
 Base::addTLB(BaseTLB *t)
 {
-    // tlb is allowed to be non-null, because of taking over
+    fatal_if(tlb != nullptr, "Only one TLB can be registered");
     tlb = t;
 }
 
