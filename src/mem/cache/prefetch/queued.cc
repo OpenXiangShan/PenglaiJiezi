@@ -61,8 +61,16 @@ Queued::DeferredPacket::createPkt(Addr paddr, unsigned blk_size,
                                             bool tag_prefetch,
                                             Tick t) {
     /* Create a prefetch memory request */
-    RequestPtr req = std::make_shared<Request>(paddr, blk_size,
-                                                0, requestor_id);
+    RequestPtr req;
+    if (owner->useVirtualAddresses && pfInfo.hasPC()) {
+        req = std::make_shared<Request>(pfInfo.getAddr(), blk_size, 0,
+                                        requestor_id, pfInfo.getPC(), 0);
+        req->setPaddr(paddr);
+    } else {
+        req = std::make_shared<Request>(paddr, blk_size, 0, requestor_id);
+    }
+
+    req->setFlags(Request::PREFETCH);
 
     if (pfInfo.isSecure()) {
         req->setFlags(Request::SECURE);
@@ -105,7 +113,11 @@ Queued::Queued(const QueuedPrefetcherParams &p)
       latency(p.latency), queueSquash(p.queue_squash),
       queueFilter(p.queue_filter), cacheSnoop(p.cache_snoop),
       tagPrefetch(p.tag_prefetch),
-      throttleControlPct(p.throttle_control_percentage), statsQueued(this)
+      throttleControlPct(p.throttle_control_percentage),
+      tlbReqEvent(
+          [this]{ processMissingTranslations(queueSize); },
+          name()),
+      statsQueued(this)
 {
 }
 
@@ -239,11 +251,6 @@ Queued::getPacket()
 {
     DPRINTF(HWPrefetch, "Requesting a prefetch to issue.\n");
 
-    if (pfq.empty()) {
-        // If the queue is empty, attempt first to fill it with requests
-        // from the queue of missing translations
-        processMissingTranslations(queueSize);
-    }
 
     if (pfq.empty()) {
         DPRINTF(HWPrefetch, "No hardware prefetches available.\n");
@@ -258,7 +265,6 @@ Queued::getPacket()
     assert(pkt != nullptr);
     DPRINTF(HWPrefetch, "Generating prefetch for %#x.\n", pkt->getAddr());
 
-    processMissingTranslations(queueSize - pfq.size());
     return pkt;
 }
 
@@ -301,6 +307,7 @@ Queued::processMissingTranslations(unsigned max)
 void
 Queued::translationComplete(DeferredPacket *dp, bool failed)
 {
+    bool in_squash = false;
     auto it = pfqMissingTranslation.begin();
     while (it != pfqMissingTranslation.end()) {
         if (&(*it) == dp) {
@@ -308,31 +315,47 @@ Queued::translationComplete(DeferredPacket *dp, bool failed)
         }
         it++;
     }
-    assert(it != pfqMissingTranslation.end());
-    if (!failed) {
-        DPRINTF(HWPrefetch, "%s Translation of vaddr %#x succeeded: "
-                "paddr %#x \n", tlb->name(),
-                it->translationRequest->getVaddr(),
-                it->translationRequest->getPaddr());
-        Addr target_paddr = it->translationRequest->getPaddr();
-        // check if this prefetch is already redundant
-        if (cacheSnoop && (inCache(target_paddr, it->pfInfo.isSecure()) ||
-                    inMissQueue(target_paddr, it->pfInfo.isSecure()))) {
-            statsQueued.pfInCache++;
-            DPRINTF(HWPrefetch, "Dropping redundant in "
-                    "cache/MSHR prefetch addr:%#x\n", target_paddr);
-        } else {
-            Tick pf_time = curTick() + clockPeriod() * latency;
-            it->createPkt(target_paddr, blkSize, requestorId, tagPrefetch,
-                          pf_time);
-            addToQueue(pfq, *it);
+    // If the dp is not in pfqMissingTranslation,
+    // we will find it in pfqSquashed
+    if (it == pfqMissingTranslation.end()){
+        in_squash = true;
+        it = pfqSquashed.begin();
+        while (it != pfqSquashed.end()) {
+            if (&(*it) == dp) {
+                break;
+            }
+            it++;
         }
-    } else {
-        DPRINTF(HWPrefetch, "%s Translation of vaddr %#x failed, dropping "
-                "prefetch request %#x \n", tlb->name(),
-                it->translationRequest->getVaddr());
+        assert(it != pfqSquashed.end());
     }
-    pfqMissingTranslation.erase(it);
+    if (!in_squash){
+        if (!failed) {
+            DPRINTF(HWPrefetch, "%s Translation of vaddr %#x succeeded: "
+                    "paddr %#x \n", tlb->name(),
+                    it->translationRequest->getVaddr(),
+                    it->translationRequest->getPaddr());
+            Addr target_paddr = it->translationRequest->getPaddr();
+            // check if this prefetch is already redundant
+            if (cacheSnoop && (inCache(target_paddr, it->pfInfo.isSecure()) ||
+                        inMissQueue(target_paddr, it->pfInfo.isSecure()))) {
+                statsQueued.pfInCache++;
+                DPRINTF(HWPrefetch, "Dropping redundant in "
+                        "cache/MSHR prefetch addr:%#x\n", target_paddr);
+            } else {
+                Tick pf_time = curTick() + clockPeriod() * latency;
+                it->createPkt(target_paddr, blkSize, requestorId, tagPrefetch,
+                            pf_time);
+                addToQueue(pfq, *it);
+            }
+        } else {
+            DPRINTF(HWPrefetch, "%s Translation of vaddr %#x failed, dropping "
+                    "prefetch request %#x \n", tlb->name(),
+                    it->translationRequest->getVaddr());
+        }
+        pfqMissingTranslation.erase(it);
+    } else {
+        pfqSquashed.erase(it);
+    }
 }
 
 bool
@@ -351,15 +374,10 @@ Queued::alreadyInQueue(std::list<DeferredPacket> &queue,
         if (it->priority < priority) {
             /* Update priority value and position in the queue */
             it->priority = priority;
-            iterator prev = it;
-            while (prev != queue.begin()) {
-                prev--;
-                /* If the packet has higher priority, swap */
-                if (*it > *prev) {
-                    std::swap(*it, *prev);
-                    it = prev;
-                }
-            }
+            /* Because swap() will cause the translationComplete
+             * run into wrong DeferredPacket, we use std::list::sort
+             * to update this queue */
+            queue.sort(std::greater<DeferredPacket>());
             DPRINTF(HWPrefetch, "Prefetch addr already in "
                 "prefetch queue, priority updated\n");
         } else {
@@ -477,6 +495,9 @@ Queued::insert(const PacketPtr &pkt, PrefetchInfo &new_pfi,
         DPRINTF(HWPrefetch, "Prefetch queued with no translation. "
                 "addr:%#x priority: %3d\n", new_pfi.getAddr(), priority);
         addToQueue(pfqMissingTranslation, dpp);
+        if (!tlbReqEvent.scheduled()) {
+            schedule(tlbReqEvent, nextCycle());
+        }
     }
 }
 
@@ -485,7 +506,14 @@ Queued::addToQueue(std::list<DeferredPacket> &queue,
                              DeferredPacket &dpp)
 {
     /* Verify prefetch buffer space for request */
-    if (queue.size() == queueSize) {
+    unsigned queue_size;
+    if (&queue == &pfq) {
+        queue_size = queueSize;
+    } else {
+        assert(&queue == &pfqMissingTranslation);
+        queue_size = missingTranslationQueueSize;
+    }
+    if (queue.size() == queue_size) {
         statsQueued.pfRemovedFull++;
         /* Lowest priority packet */
         iterator it = queue.end();
@@ -508,8 +536,21 @@ Queued::addToQueue(std::list<DeferredPacket> &queue,
         }
         DPRINTF(HWPrefetch, "Prefetch queue full, removing lowest priority "
                             "oldest packet, addr: %#x\n",it->pfInfo.getAddr());
-        delete it->pkt;
-        queue.erase(it);
+        if (&queue == &pfq || !it->ongoingTranslation){
+            delete it->pkt;
+            queue.erase(it);
+        } else {
+            /* If the packet's translation is on going,
+             * we can't erase it here. Just put it into
+             * the pfqSquashed list and wait for
+             * translationComplete to erase it */
+            assert(&queue == &pfqMissingTranslation);
+            DeferredPacket * old_ptr = &(*it);
+            pfqSquashed.splice(pfqSquashed.end(),queue,it);
+            it = pfqSquashed.end();
+            it--;
+            assert(&(*it) == old_ptr);
+        }
     }
 
     if ((queue.size() == 0) || (dpp <= queue.back())) {
