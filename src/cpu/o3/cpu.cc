@@ -54,11 +54,9 @@
 #include "cpu/simple_thread.hh"
 #include "cpu/thread_context.hh"
 #include "debug/Activity.hh"
-#include "debug/Commit.hh"
 #include "debug/Drain.hh"
 #include "debug/O3CPU.hh"
 #include "debug/Quiesce.hh"
-#include "debug/ValueCommit.hh"
 #include "enums/MemoryMode.hh"
 #include "sim/async.hh"
 #include "sim/cur_tick.hh"
@@ -90,7 +88,7 @@ CPU::CPU(const BaseO3CPUParams &params)
       decode(this, params),
       rename(this, params),
       iew(this, params),
-      commit(this, fetch.getBp(), params),
+      commit(this, params),
 
       regFile(params.numPhysIntRegs,
               params.numPhysFloatRegs,
@@ -1237,6 +1235,7 @@ CPU::addInst(const DynInstPtr &inst)
 void
 CPU::instDone(ThreadID tid, const DynInstPtr &inst)
 {
+    // Keep an instruction count.
     if (!inst->isMicroop() || inst->isLastMicroop()) {
         thread[tid]->numInst++;
         thread[tid]->threadStats.numInsts++;
@@ -1616,8 +1615,6 @@ CPU::readArchIntReg(int reg_idx, ThreadID tid)
     PhysRegIdPtr phys_reg =
         commitRenameMap[tid].lookup(RegId(IntRegClass, reg_idx));
 
-    DPRINTF(Commit, "Get map: x%i -> p%i\n", reg_idx, phys_reg->flatIndex());
-
     return regFile.getReg(phys_reg);
 }
 
@@ -1627,8 +1624,6 @@ CPU::readArchFloatReg(int reg_idx, ThreadID tid)
     cpuStats.fpRegfileReads++;
     PhysRegIdPtr phys_reg =
         commitRenameMap[tid].lookup(RegId(FloatRegClass, reg_idx));
-    DPRINTF(Commit, "Get map: f%i -> p%i\n", reg_idx, phys_reg->flatIndex());
-
     return regFile.getReg(phys_reg);
 }
 

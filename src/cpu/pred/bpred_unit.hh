@@ -47,7 +47,6 @@
 #include "base/statistics.hh"
 #include "base/types.hh"
 #include "cpu/inst_seq.hh"
-#include "cpu/pred/bp_type.hh"
 #include "cpu/pred/btb.hh"
 #include "cpu/pred/indirect.hh"
 #include "cpu/pred/ras.hh"
@@ -192,23 +191,14 @@ class BPredUnit : public SimObject
     void
     BTBUpdate(Addr instPC, const PCStateBase &target)
     {
+        ++stats.BTBUpdates;
         BTB.update(instPC, target, 0);
     }
 
 
     void dump();
 
-    BpType bpType;
-    bool isDecoupled() const { return bpType == DecoupledStreamType || bpType == DecoupledFTBType; }
-    bool isStream() const { return bpType == DecoupledStreamType; }
-    bool isFTB() const { return bpType == DecoupledFTBType; }
-
   private:
-
-  protected:
-
-    void resetStats() override;
-
     struct PredictorHistory
     {
         /**
@@ -325,6 +315,8 @@ class BPredUnit : public SimObject
         statistics::Scalar condIncorrect;
         /** Stat for number of BTB lookups. */
         statistics::Scalar BTBLookups;
+        /** Stat for number of BTB updates. */
+        statistics::Scalar BTBUpdates;
         /** Stat for number of BTB hits. */
         statistics::Scalar BTBHits;
         /** Stat for the ratio between BTB hits and BTB lookups. */
@@ -343,9 +335,6 @@ class BPredUnit : public SimObject
         /** Stat for the number of indirect target mispredictions.*/
         statistics::Scalar indirectMispredicted;
     } stats;
-
-    std::map<Addr, uint32_t> missPredPcCount;
-    bool isDumpMissPredPC;
 
   protected:
     /** Number of bits to shift instructions by for predictor addresses. */
