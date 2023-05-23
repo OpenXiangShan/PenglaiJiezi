@@ -261,6 +261,9 @@ class MemDepUnit
     /** Pointer to the IQ. */
     InstructionQueue *iqPtr;
 
+    /** Pointer to the CPU. */
+    CPU *cpu;
+
     /** The thread id of this memory dependence unit. */
     int id;
     struct MemDepUnitStats : public statistics::Group

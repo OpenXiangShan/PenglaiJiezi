@@ -56,8 +56,8 @@ MemDepUnit::MemDepUnit() : iqPtr(NULL), stats(nullptr) {}
 
 MemDepUnit::MemDepUnit(const BaseO3CPUParams &params)
     : _name(params.name + ".memdepunit"),
-      depPred(params.store_set_clear_period, params.SSITSize,
-              params.LFSTSize),
+      depPred(params.store_set_clear_period, params.store_set_clear_thres,
+                params.SSITSize, params.LFSTSize, params.LFSTEntrySize),
       iqPtr(NULL),
       stats(nullptr)
 {
@@ -89,18 +89,20 @@ MemDepUnit::~MemDepUnit()
 }
 
 void
-MemDepUnit::init(const BaseO3CPUParams &params, ThreadID tid, CPU *cpu)
+MemDepUnit::init(const BaseO3CPUParams &params, ThreadID tid, CPU *_cpu)
 {
     DPRINTF(MemDepUnit, "Creating MemDepUnit %i object.\n",tid);
 
     _name = csprintf("%s.memDep%d", params.name, tid);
     id = tid;
 
-    depPred.init(params.store_set_clear_period, params.SSITSize,
-            params.LFSTSize);
+    depPred.init(params.store_set_clear_period, params.store_set_clear_thres,
+            params.SSITSize, params.LFSTSize, params.LFSTEntrySize);
 
     std::string stats_group_name = csprintf("MemDepUnit__%i", tid);
-    cpu->addStatGroup(stats_group_name.c_str(), &stats);
+    _cpu->addStatGroup(stats_group_name.c_str(), &stats);
+
+    cpu = _cpu;
 }
 
 MemDepUnit::MemDepUnitStats::MemDepUnitStats(statistics::Group *parent)
@@ -191,6 +193,7 @@ MemDepUnit::insertBarrierSN(const DynInstPtr &barr_inst)
 void
 MemDepUnit::insert(const DynInstPtr &inst)
 {
+    DPRINTF(MemDepUnit, "in func: %s, pc:%s\n", __func__, inst->pcState());
     ThreadID tid = inst->threadNumber;
 
     MemDepEntryPtr inst_entry = std::make_shared<MemDepEntry>(inst);
@@ -205,6 +208,21 @@ MemDepUnit::insert(const DynInstPtr &inst)
     instList[tid].push_back(inst);
 
     inst_entry->listIt = --(instList[tid].end());
+
+
+    if (inst->isStore() || inst->isAtomic()) {
+        DPRINTF(MemDepUnit, "Inserting store/atomic PC %s [sn:%lli].\n",
+                inst->pcState(), inst->seqNum);
+
+        depPred.insertStore(inst->pcState().instAddr(), inst->seqNum,
+                inst->threadNumber, cpu->curCycle());
+
+        ++stats.insertedStores;
+    } else if (inst->isLoad()) {
+        ++stats.insertedLoads;
+    } else {
+        panic("Unknown type! (most likely a barrier).");
+    }
 
     // Check any barriers and the dependence predictor for any
     // producing memrefs/stores.
@@ -222,9 +240,26 @@ MemDepUnit::insert(const DynInstPtr &inst)
                                 std::begin(storeBarrierSNs),
                                 std::end(storeBarrierSNs));
     } else {
-        InstSeqNum dep = depPred.checkInst(inst->pcState().instAddr());
-        if (dep != 0)
-            producing_stores.push_back(dep);
+        // before: check two stores with same address
+        // store a1,(a0), store a2,(a0)
+        // after: do not check store dependence, because concentrated
+        // and inroder store queue will assure store will not violated
+        // each other. so, only check load->store violation
+        std::vector<InstSeqNum> dep = {};
+        if (inst->isLoad()) {
+            dep = depPred.checkInst(inst->pcState().instAddr());
+
+            if (depPred.checkInstStrict(inst->pcState().instAddr()))
+            {
+                inst->staticInst->setLoadStrict();
+            }
+
+        }
+
+        if (!dep.empty())
+            for ( int i=0; i<dep.size(); i++) {
+                producing_stores.push_back(dep[i]);
+            }
     }
 
     std::vector<MemDepEntryPtr> store_entries;
@@ -284,19 +319,6 @@ MemDepUnit::insert(const DynInstPtr &inst)
     // for load-acquire store-release that could also be a barrier
     insertBarrierSN(inst);
 
-    if (inst->isStore() || inst->isAtomic()) {
-        DPRINTF(MemDepUnit, "Inserting store/atomic PC %s [sn:%lli].\n",
-                inst->pcState(), inst->seqNum);
-
-        depPred.insertStore(inst->pcState().instAddr(), inst->seqNum,
-                inst->threadNumber);
-
-        ++stats.insertedStores;
-    } else if (inst->isLoad()) {
-        ++stats.insertedLoads;
-    } else {
-        panic("Unknown type! (most likely a barrier).");
-    }
 }
 
 void
@@ -311,7 +333,7 @@ MemDepUnit::insertNonSpec(const DynInstPtr &inst)
                 inst->pcState(), inst->seqNum);
 
         depPred.insertStore(inst->pcState().instAddr(), inst->seqNum,
-                inst->threadNumber);
+                inst->threadNumber, cpu->curCycle());
 
         ++stats.insertedStores;
     } else if (inst->isLoad()) {

@@ -524,8 +524,14 @@ class LSQUnit
          * ignored due to the instruction already being squashed. */
         statistics::Scalar ignoredResponses;
 
-        /** Tota number of memory ordering violations. */
-        statistics::Scalar memOrderViolation;
+        /** Tota number of memory ordering violations. load->store*/
+        statistics::Scalar memOrderViolationLdSt;
+
+        /** Tota number of memory ordering violations. store->store*/
+        statistics::Scalar memOrderViolationStSt;
+
+        /** Tota number of memory ordering violations. load->snoop*/
+        statistics::Scalar memOrderViolationLdSnoop;
 
         /** Total number of squashed stores. */
         statistics::Scalar squashedStores;

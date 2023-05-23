@@ -262,7 +262,11 @@ LSQUnit::LSQUnitStats::LSQUnitStats(statistics::Group *parent)
       ADD_STAT(ignoredResponses, statistics::units::Count::get(),
                "Number of memory responses ignored because the instruction is "
                "squashed"),
-      ADD_STAT(memOrderViolation, statistics::units::Count::get(),
+      ADD_STAT(memOrderViolationLdSt, statistics::units::Count::get(),
+               "Number of memory ordering violations"),
+      ADD_STAT(memOrderViolationStSt, statistics::units::Count::get(),
+               "Number of memory ordering violations"),
+      ADD_STAT(memOrderViolationLdSnoop, statistics::units::Count::get(),
                "Number of memory ordering violations"),
       ADD_STAT(squashedStores, statistics::units::Count::get(),
                "Number of stores squashed"),
@@ -541,6 +545,7 @@ LSQUnit::checkViolations(typename LoadQueue::iterator& loadIt,
         DPRINTF(LSQUnit, "Checking for violations for load [sn:%lli], addr: %#lx\n",
                 ld_inst->seqNum, ld_inst->effAddr);
         if (inst_eff_addr2 >= ld_eff_addr1 && inst_eff_addr1 <= ld_eff_addr2) {
+            // load->load violation check
             if (inst->isLoad()) {
                 // If this load is to the same block as an external snoop
                 // invalidate that we've observed then the load needs to be
@@ -549,11 +554,13 @@ LSQUnit::checkViolations(typename LoadQueue::iterator& loadIt,
                     if (!memDepViolator ||
                             ld_inst->seqNum < memDepViolator->seqNum) {
                         DPRINTF(LSQUnit, "Detected fault with inst [sn:%lli] "
-                                "and [sn:%lli] at address %#x\n",
-                                inst->seqNum, ld_inst->seqNum, ld_eff_addr1);
+                                "and [sn:%lli] at address %#x, pc:%s\n",
+                                inst->seqNum, ld_inst->seqNum,
+                                ld_eff_addr1, ld_inst->pcState());
                         memDepViolator = ld_inst;
 
-                        ++stats.memOrderViolation;
+                        ++stats.memOrderViolationLdSnoop;
+                        ++stats.memOrderViolationLdSt;
 
                         return std::make_shared<GenericISA::M5PanicFault>(
                             "Detected fault with inst [sn:%lli] and "
@@ -569,6 +576,7 @@ LSQUnit::checkViolations(typename LoadQueue::iterator& loadIt,
                         " between instructions [sn:%lli] and [sn:%lli]\n",
                         inst_eff_addr1, inst->seqNum, ld_inst->seqNum);
             } else {
+                // load/store->store violation check
                 // A load/store incorrectly passed this store.
                 // Check if we already have a violator, or if it's newer
                 // squash and refetch.
@@ -585,7 +593,7 @@ LSQUnit::checkViolations(typename LoadQueue::iterator& loadIt,
                         inst->seqNum, ld_inst->seqNum, ld_eff_addr1);
                 memDepViolator = ld_inst;
 
-                ++stats.memOrderViolation;
+                ++stats.memOrderViolationStSt;
 
                 return std::make_shared<GenericISA::M5PanicFault>(
                     "Detected fault with "
@@ -661,6 +669,7 @@ LSQUnit::executeLoad(const DynInstPtr &inst)
             auto it = inst->lqIt;
             ++it;
 
+            // check load->load_snoop violation
             if (checkLoads)
                 return checkViolations(it, inst);
         }
@@ -727,6 +736,7 @@ LSQUnit::executeStore(const DynInstPtr &store_inst)
         ++storesToWB;
     }
 
+    // check load->store violation
     return checkViolations(loadIt, store_inst);
 
 }

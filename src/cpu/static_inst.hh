@@ -201,6 +201,7 @@ class StaticInst : public RefCounted, public StaticInstFlags
     bool isHtmStart() const { return flags[IsHtmStart]; }
     bool isHtmStop() const { return flags[IsHtmStop]; }
     bool isHtmCancel() const { return flags[IsHtmCancel]; }
+    bool isLoadStrict() const { return flags[IsLoadStrict]; }
 
     bool
     isHtmCmd() const
@@ -213,6 +214,7 @@ class StaticInst : public RefCounted, public StaticInstFlags
     void setLastMicroop() { flags[IsLastMicroop] = true; }
     void setDelayedCommit() { flags[IsDelayedCommit] = true; }
     void setFlag(Flags f) { flags[f] = true; }
+    void setLoadStrict() { flags[IsLoadStrict] = true; }
 
     /// Operation class.  Used to select appropriate function unit in issue.
     OpClass opClass() const { return _opClass; }

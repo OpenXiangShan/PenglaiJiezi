@@ -1058,6 +1058,9 @@ InstructionQueue::wakeDependents(const DynInstPtr &completed_inst)
         iqIOStats.intInstQueueWakeupAccesses++;
     }
 
+    DPRINTF(IQ, "Completing instruction PC: %s [sn:%llu]\n",
+            completed_inst->pcState(), completed_inst->seqNum);
+
     completed_inst->lastWakeDependents = curTick();
 
     DPRINTF(IQ, "Waking dependents of completed instruction.\n");

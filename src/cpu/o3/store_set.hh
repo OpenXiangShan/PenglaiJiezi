@@ -29,6 +29,7 @@
 #ifndef __CPU_O3_STORE_SET_HH__
 #define __CPU_O3_STORE_SET_HH__
 
+#include <cmath>
 #include <list>
 #include <map>
 #include <utility>
@@ -69,13 +70,15 @@ class StoreSet
     StoreSet() { };
 
     /** Creates store set predictor with given table sizes. */
-    StoreSet(uint64_t clear_period, int SSIT_size, int LFST_size);
+    StoreSet(uint64_t clear_period, int64_t clear_period_thres,
+            int SSIT_size, int LFST_size, int LFST_entry_size);
 
     /** Default destructor. */
     ~StoreSet();
 
     /** Initializes the store set predictor with the given table sizes. */
-    void init(uint64_t clear_period, int SSIT_size, int LFST_size);
+    void init(uint64_t clear_period, int64_t clear_period_thres,
+          int SSIT_size, int LFST_size, int LFST_entry_size);
 
     /** Records a memory ordering violation between the younger load
      * and the older store. */
@@ -85,7 +88,7 @@ class StoreSet
      * entries aren't used and stores are constantly predicted as
      * conflicting.
      */
-    void checkClear();
+    void checkClear(Cycles curCycle);
 
     /** Inserts a load into the store set predictor.  This does nothing but
      * is included in case other predictors require a similar function.
@@ -94,13 +97,26 @@ class StoreSet
 
     /** Inserts a store into the store set predictor.  Updates the
      * LFST if the store has a valid SSID. */
-    void insertStore(Addr store_PC, InstSeqNum store_seq_num, ThreadID tid);
+    void insertStore(Addr store_PC, InstSeqNum store_seq_num,
+              ThreadID tid, Cycles curCycle);
+
+    /**
+     * @brief find victim entry in one specific LFST entry
+     *
+     * @param store_SSID
+     * @return the index (0-LFSTEntrySize) of the inst id
+     *     in one LFST entry
+     */
+    int findVictimInLFSTEntry(int store_SSID);
 
     /** Checks if the instruction with the given PC is dependent upon
      * any store.  @return Returns the sequence number of the store
      * instruction this PC is dependent upon.  Returns 0 if none.
      */
-    InstSeqNum checkInst(Addr PC);
+    std::vector<InstSeqNum> checkInst(Addr PC);
+    bool checkInstStrict(Addr PC);
+    Addr XORFold(Addr pc, Addr resetWidth);
+
 
     /** Records this PC/sequence number as issued. */
     void issued(Addr issued_PC, InstSeqNum issued_seq_num, bool is_store);
@@ -116,42 +132,82 @@ class StoreSet
 
   private:
     /** Calculates the index into the SSIT based on the PC. */
-    inline int calcIndex(Addr PC)
-    { return (PC >> offsetBits) & indexMask; }
+    //inline int calcIndex(Addr PC)
+    //{ return (PC >> offsetBits) & indexMask; }
+
+    inline int calcIndexSSIT(Addr PC)
+    { return XORFold(PC, log2(SSITSize)); }
+
+
 
     /** Calculates a Store Set ID based on the PC. */
+    //inline SSID calcSSID(Addr PC)
+    //{ return ((PC ^ (PC >> 10)) % LFSTSize); }
+
     inline SSID calcSSID(Addr PC)
-    { return ((PC ^ (PC >> 10)) % LFSTSize); }
+    { return XORFold(XORFold(PC, log2(SSITSize)), log2(LFSTSize)); }
 
     /** The Store Set ID Table. */
     std::vector<SSID> SSIT;
 
     /** Bit vector to tell if the SSIT has a valid entry. */
     std::vector<bool> validSSIT;
+    /** Bit vector to tell if the SSIT entry loadWaitStrict. */
+    std::vector<bool> SSITStrict;
 
     /** Last Fetched Store Table. */
-    std::vector<InstSeqNum> LFST;
+    //std::vector<InstSeqNum> LFST;
 
     /** Bit vector to tell if the LFST has a valid entry. */
-    std::vector<bool> validLFST;
+    //std::vector<bool> validLFST;
+
+    /** Last Fetched Store Table. */
+    std::vector<std::vector<InstSeqNum>> LFSTLarge;
+    /** for DEBUG: Last Fetched Store Table with pc */
+    std::vector<std::vector<InstSeqNum>> LFSTLargePC;
+
+    /** To tell if the LFST has a valid entry.
+     * One LFST entry can contain upto LFSTEntrySize valid index
+     */
+    std::vector<std::vector<bool>> validLFSTLarge;
+
+    /** The last victim id of store inst when there is no invalid
+     * inst in every entry of LFST*/
+    std::vector<int> VictimEntryID;
+
+    /** To tell if the seqNum in one LFST entry
+     *  SSID -> storeSeqNum0, storeSeqNum1, storeSeqNum2, storeSeqNum3
+     */
+    //std::vector<std::vector<InstSeqNum>> storeSeqNum;
 
     /** Map of stores that have been inserted into the store set, but
      * not yet issued or squashed.
+     *  SeqNum : SSID
      */
-    std::map<InstSeqNum, int, ltseqnum> storeList;
+    //std::map<InstSeqNum, int, ltseqnum> storeList;
 
-    typedef std::map<InstSeqNum, int, ltseqnum>::iterator SeqNumMapIt;
+    //typedef std::map<InstSeqNum, int, ltseqnum>::iterator SeqNumMapIt;
 
     /** Number of loads/stores to process before wiping predictor so all
      * entries don't get saturated
      */
     uint64_t clearPeriod;
 
+    /** Number of cycles to process before wiping predictor so all
+     * entries don't get saturated
+     */
+    int64_t clearPeriodThreshold;
+    int64_t lastClearPeriodCycle;
+    //Cycles cycles(curCycle() - lastRunningCycle);
+
     /** Store Set ID Table size, in entries. */
     int SSITSize;
 
     /** Last Fetched Store Table size, in entries. */
     int LFSTSize;
+
+    /** The number of store inst in every entry of LFST can contain */
+    int LFSTEntrySize;
 
     /** Mask to obtain the index. */
     int indexMask;

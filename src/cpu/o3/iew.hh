@@ -456,7 +456,14 @@ class IEW
         /** Stat for number of times the LSQ becomes full. */
         statistics::Scalar lsqFullEvents;
         /** Stat for total number of memory ordering violation events. */
-        statistics::Scalar memOrderViolationEvents;
+        statistics::Scalar memOrderViolationEventsNotValid;
+        /** Stat for total number of memory ordering violation events. */
+        statistics::Scalar memOrderViolationEventsStSt;
+        /** Stat for total number of memory ordering violation events. */
+        statistics::Scalar memOrderViolationEventsLdSt;
+        /** Stat for total number of memory ordering violation events. */
+        statistics::Scalar memOrderViolationEventsLdLd;
+
         /** Stat for total number of incorrect predicted taken branches. */
         statistics::Scalar predictedTakenIncorrect;
         /** Stat for total number of incorrect predicted not taken branches. */

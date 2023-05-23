@@ -174,8 +174,15 @@ IEW::IEWStats::IEWStats(CPU *cpu)
              "Number of times the IQ has become full, causing a stall"),
     ADD_STAT(lsqFullEvents, statistics::units::Count::get(),
              "Number of times the LSQ has become full, causing a stall"),
-    ADD_STAT(memOrderViolationEvents, statistics::units::Count::get(),
-             "Number of memory order violations"),
+    ADD_STAT(memOrderViolationEventsNotValid, statistics::units::Count::get(),
+             "Number of memory order violations, already squashing"),
+    ADD_STAT(memOrderViolationEventsStSt, statistics::units::Count::get(),
+             "Number of memory order violations,store store violation"),
+    ADD_STAT(memOrderViolationEventsLdSt, statistics::units::Count::get(),
+             "Number of memory order violations, load store violation"),
+    ADD_STAT(memOrderViolationEventsLdLd, statistics::units::Count::get(),
+             "Number of memory order violations, load load violation"),
+
     ADD_STAT(predictedTakenIncorrect, statistics::units::Count::get(),
              "Number of branches that were predicted taken incorrectly"),
     ADD_STAT(predictedNotTakenIncorrect, statistics::units::Count::get(),
@@ -1545,7 +1552,12 @@ IEW::executeInsts()
                 // Squash.
                 squashDueToMemOrder(violator, tid);
 
-                ++iewStats.memOrderViolationEvents;
+                if (inst->isLoad() && violator->isLoad())
+                    ++iewStats.memOrderViolationEventsLdLd;
+                else if (inst->isStore() && violator->isLoad())
+                    ++iewStats.memOrderViolationEventsLdSt;
+                else if (inst->isStore() && violator->isStore())
+                    ++iewStats.memOrderViolationEventsStSt;
             }
         } else {
             // Reset any state associated with redirects that will not
@@ -1562,7 +1574,7 @@ IEW::executeInsts()
                 DPRINTF(IEW, "Violation will not be handled because "
                         "already squashing\n");
 
-                ++iewStats.memOrderViolationEvents;
+                ++iewStats.memOrderViolationEventsNotValid;
             }
         }
     }
