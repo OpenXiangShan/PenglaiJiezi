@@ -56,7 +56,6 @@
 #include "cpu/timebuf.hh"
 #include "debug/Activity.hh"
 #include "debug/Counters.hh"
-#include "debug/DecoupleBP.hh"
 #include "debug/Drain.hh"
 #include "debug/IEW.hh"
 #include "debug/O3PipeView.hh"
@@ -566,13 +565,6 @@ IEW::squashDueToBranch(const DynInstPtr& inst, ThreadID tid)
         toCommit->includeSquashInst[tid] = false;
 
         wroteToTimeBuffer = true;
-
-        DPRINTF(DecoupleBP,
-                "Branch misprediction (pc=%#lx) set stream id to %lu, target "
-                "id to %lu\n",
-                toCommit->pc[tid]->instAddr(),
-                toCommit->squashedStreamId[tid],
-                toCommit->squashedTargetId[tid]);
     }
 
 }
@@ -602,13 +594,6 @@ IEW::squashDueToMemOrder(const DynInstPtr& inst, ThreadID tid)
         toCommit->includeSquashInst[tid] = true;
 
         wroteToTimeBuffer = true;
-
-        DPRINTF(DecoupleBP,
-                "Memory violation (pc=%#lx) set stream id to %lu, target id "
-                "to %lu\n",
-                toCommit->pc[tid]->instAddr(),
-                toCommit->squashedStreamId[tid],
-                toCommit->squashedTargetId[tid]);
 
 
     }

@@ -50,7 +50,6 @@
 #include "debug/Activity.hh"
 #include "debug/Counters.hh"
 #include "debug/Decode.hh"
-#include "debug/DecoupleBP.hh"
 #include "debug/O3PipeView.hh"
 #include "params/BaseO3CPU.hh"
 #include "sim/full_system.hh"
@@ -778,10 +777,6 @@ Decode::decodeInsts(ThreadID tid)
             auto &t = target->as<RiscvISA::PCState>();
             auto &pred = inst->readPredTarg().as<RiscvISA::PCState>();
             if (t.start_equals(pred) && !t.equals(pred)) {
-                DPRINTF(
-                    DecoupleBP,
-                    "Override useless npc, from %#lx->%#lx to %#lx->%#lx\n",
-                    pred.pc(), pred.npc(), t.pc(), t.npc());
                 inst->setPredTarg(t);
             }
             if (*target != inst->readPredTarg()) {
