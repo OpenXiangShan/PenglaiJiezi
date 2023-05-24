@@ -180,6 +180,3 @@ class BaseO3CPU(BaseCPU):
         TournamentBP(numThreads=Parent.numThreads), "Branch Predictor"
     )
     needsTSO = Param.Bool(False, "Enable TSO Memory model")
-
-    iewDelayCalibrator = Param.DelayCalibrator(DefaultDelayMatrix(),
-                                               "iew schedule and execute tick calibrator ")

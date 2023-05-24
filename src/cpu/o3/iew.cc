@@ -59,7 +59,6 @@
 #include "debug/Drain.hh"
 #include "debug/IEW.hh"
 #include "debug/O3PipeView.hh"
-#include "debug/Rename.hh"
 #include "params/BaseO3CPU.hh"
 #include "sim/core.hh"
 
@@ -1695,7 +1694,6 @@ IEW::tick()
     for (int i = 0;i < dispatchStalls.size();i++) {
         iewStats.dispatchStallReason[dispatchStalls[i]]++;
     }
-    instQueue.delayWakeDependents();
 
     if (exeStatus != Squashing) {
         executeInsts();
