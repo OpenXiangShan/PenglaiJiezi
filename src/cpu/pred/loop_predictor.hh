@@ -262,10 +262,6 @@ class LoopPredictor : public SimObject
     LoopPredictor(const LoopPredictorParams &p);
 
     size_t getSizeInBits() const;
-
-    bool debugFlagOn;
-
-    using defer = std::shared_ptr<void>;
 };
 
 } // namespace branch_prediction

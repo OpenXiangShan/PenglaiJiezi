@@ -70,7 +70,6 @@
 #include "debug/Diff.hh"
 #include "debug/Drain.hh"
 #include "debug/ExecFaulting.hh"
-#include "debug/FTBStats.hh"
 #include "debug/Faults.hh"
 #include "debug/HtmCpu.hh"
 #include "debug/InstCommited.hh"
@@ -94,10 +93,9 @@ Commit::processTrapEvent(ThreadID tid)
     trapSquash[tid] = true;
 }
 
-Commit::Commit(CPU *_cpu, branch_prediction::BPredUnit *_bp, const BaseO3CPUParams &params)
+Commit::Commit(CPU *_cpu, const BaseO3CPUParams &params)
     : commitPolicy(params.smtCommitPolicy),
       cpu(_cpu),
-      bp(_bp),
       iewToCommitDelay(params.iewToCommitDelay),
       commitToIEWDelay(params.commitToIEWDelay),
       renameToROBDelay(params.renameToROBDelay),
@@ -1088,66 +1086,6 @@ Commit::commitInsts()
             bool commit_success = commitHead(head_inst, num_committed);
 
             if (commit_success) {
-                if (bp->isStream()) {
-                    auto dbsp = dynamic_cast<branch_prediction::stream_pred::DecoupledStreamBPU*>(bp);
-                    Addr branchAddr = head_inst->pcState().instAddr();
-                    Addr targetAddr = head_inst->pcState().clone()->as<RiscvISA::PCState>().npc();
-                    Addr fallThruPC = head_inst->pcState().clone()->as<RiscvISA::PCState>().getFallThruPC();
-                    if (targetAddr < branchAddr || dbsp->loopDetector->findLoop(branchAddr)) {
-                        dbsp->loopDetector->update(branchAddr, targetAddr, fallThruPC);
-                    }
-                    if (targetAddr > branchAddr && head_inst->isControl()) {
-                        dbsp->loopDetector->setRecentForwardTakenPC(branchAddr, targetAddr);
-                    }
-                }
-
-                if (bp->isFTB()) {
-                    auto dbftb = dynamic_cast<branch_prediction::\
-                                    ftb_pred::DecoupledBPUWithFTB*>(bp);
-                    bool miss = head_inst->mispredicted();
-                    if (head_inst->isReturn()) {
-                        DPRINTF(FTBRAS, "commit inst PC %x miss %d"
-                            " real target %x pred target %x\n",
-                                head_inst->pcState().instAddr(),
-                                miss,
-                                head_inst->pcState().clone()->as<\
-                                    RiscvISA::PCState>().npc(),
-                                *(head_inst->predPC));
-                    }
-                    // FIXME: ignore mret/sret/uret in correspond with RTL
-                    if (!head_inst->isNonSpeculative()) {
-                        if (head_inst->isUncondCtrl()) {
-                            dbftb->addCfi(branch_prediction::ftb_pred::\
-                                DecoupledBPUWithFTB::CfiType::UNCOND, miss);
-                        }
-                        if (head_inst->isCondCtrl()) {
-                            dbftb->addCfi(branch_prediction::ftb_pred::\
-                                DecoupledBPUWithFTB::CfiType::COND, miss);
-                        }
-                        if (head_inst->isReturn()) {
-                            dbftb->addCfi(branch_prediction::ftb_pred::\
-                                DecoupledBPUWithFTB::CfiType::RETURN, miss);
-
-                        } else if (head_inst->isIndirectCtrl()) {
-                            dbftb->addCfi(branch_prediction::ftb_pred::\
-                                DecoupledBPUWithFTB::CfiType::OTHER, miss);
-                            if (miss) {
-                                misPredIndirect[
-                                        head_inst->pcState().instAddr()]++;
-                            }
-                        }
-                        DPRINTF(DBPFTBStats, "inst=%s\n",
-                            head_inst->staticInst->disassemble(
-                                    head_inst->pcState().instAddr()));
-                        DPRINTF(DBPFTBStats, "isUncondCtrl=%d, isCondCtrl=%d,"
-                                    " isReturn=%d, isIndirectCtrl=%d\n",
-                                head_inst->isUncondCtrl(),
-                                head_inst->isCondCtrl(),
-                                head_inst->isReturn(),
-                                head_inst->isIndirectCtrl());
-                    }
-                }
-
                 ++num_committed;
                 stats.committedInstType[tid][head_inst->opClass()]++;
                 ppCommit->notify(head_inst);
@@ -1624,7 +1562,6 @@ Commit::updateComInstStats(const DynInstPtr &inst)
     //
     //
     if (inst->isControl()) {
-        bool mispred = inst->mispredicted();
         std::unique_ptr<PCStateBase> tmp_next_pc(inst->pcState().clone());
         inst->staticInst->advancePC(*tmp_next_pc);
         // add if taken
@@ -1636,19 +1573,6 @@ Commit::updateComInstStats(const DynInstPtr &inst)
             }
             branchLog.push_back(temp);
         }
-        // tracing recent taken branches
-        DPRINTF(DecoupleBP, "Control inst %lu, PC: %#lx -> target: %#lx\n",
-                inst->seqNum, inst->pcState().instAddr(),
-                tmp_next_pc->instAddr());
-        DPRINTF(DecoupleBP, "mispredicted: %i, pred taken: %i\n", mispred,
-                inst->readPredTaken());
-        DPRINTF(DecoupleBP, "Start print branch logs\n");
-        for (auto it : branchLog) {
-            DPRINTF(DecoupleBP, "control pc: %#lx -> target pc: %#lx\n,",
-                    it.pc, it.target);
-        }
-        DPRINTF(DecoupleBP, "End\n");
-
 
         stats.branches[tid]++;
     }

@@ -113,10 +113,6 @@ class LTAGE : public TAGE
      */
     bool predict(
         ThreadID tid, Addr branch_pc, bool cond_branch, void* &b) override;
-
-    bool debugFlagOn;
-
-    using defer = std::shared_ptr<void>;
 };
 
 } // namespace branch_prediction

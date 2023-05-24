@@ -37,7 +37,6 @@
 
 #include "cpu/pred/ltage.hh"
 
-#include "base/debug_helper.hh"
 #include "base/intmath.hh"
 #include "base/logging.hh"
 #include "base/random.hh"
@@ -66,11 +65,6 @@ LTAGE::init()
 bool
 LTAGE::predict(ThreadID tid, Addr branch_pc, bool cond_branch, void* &b)
 {
-    defer _(nullptr, std::bind([this]{ debugFlagOn = false; }));
-    if (branch_pc == ObservingPC) {
-        debugFlagOn = true;
-    }
-
     LTageBranchInfo *bi = new LTageBranchInfo(*tage, *loopPredictor);
     b = (void*)(bi);
 
@@ -84,7 +78,7 @@ LTAGE::predict(ThreadID tid, Addr branch_pc, bool cond_branch, void* &b)
         if (bi->lpBranchInfo->loopPredUsed) {
             bi->tageBranchInfo->provider = LOOP;
         }
-        DPRINTF(LTage || debugFlagOn, "Predict for %lx: taken?:%d, loopTaken?:%d, "
+        DPRINTF(LTage, "Predict for %lx: taken?:%d, loopTaken?:%d, "
                 "loopValid?:%d, loopUseCounter:%d, tagePred:%d, altPred:%d\n",
                 branch_pc, pred_taken, bi->lpBranchInfo->loopPred,
                 bi->lpBranchInfo->loopPredValid,
@@ -103,10 +97,6 @@ void
 LTAGE::update(ThreadID tid, Addr branch_pc, bool taken, void* bp_history,
               bool squashed, const StaticInstPtr & inst, Addr corrTarget)
 {
-    defer _(nullptr, std::bind([this]{ debugFlagOn = false; }));
-    if (branch_pc == ObservingPC) {
-        debugFlagOn = true;
-    }
     assert(bp_history);
 
     LTageBranchInfo* bi = static_cast<LTageBranchInfo*>(bp_history);
@@ -126,7 +116,7 @@ LTAGE::update(ThreadID tid, Addr branch_pc, bool taken, void* bp_history,
 
     int nrand = random_mt.random<int>() & 3;
     if (bi->tageBranchInfo->condBranch) {
-        DPRINTF(LTage || debugFlagOn, "Updating tables for branch:%lx; taken?:%d\n",
+        DPRINTF(LTage, "Updating tables for branch:%lx; taken?:%d\n",
                 branch_pc, taken);
         tage->updateStats(taken, bi->tageBranchInfo);
 
