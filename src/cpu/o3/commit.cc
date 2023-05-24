@@ -590,18 +590,12 @@ Commit::squashAll(ThreadID tid)
     toIEW->commitInfo[tid].squashInst = NULL;
 
     set(toIEW->commitInfo[tid].pc, pc[tid]);
-
-    toIEW->commitInfo[tid].squashedStreamId = committedStreamId;
-    toIEW->commitInfo[tid].squashedTargetId = committedTargetId;
 }
 
 void
 Commit::squashFromTrap(ThreadID tid)
 {
     squashAll(tid);
-
-    toIEW->commitInfo[tid].isTrapSquash = true;
-    toIEW->commitInfo[tid].committedPC = committedPC[tid];
 
     DPRINTF(Commit, "Squashing from trap, restarting at PC %s\n", *pc[tid]);
 
@@ -915,18 +909,8 @@ Commit::commit()
                 fromIEW->mispredictInst[tid];
             toIEW->commitInfo[tid].branchTaken =
                 fromIEW->branchTaken[tid];
-
-            auto squashed_inst_ptr = rob->findInst(tid, squashed_inst);
-            toIEW->commitInfo[tid].squashInst = squashed_inst_ptr;
-            if (!squashed_inst_ptr) {
-                DPRINTF(Commit,
-                        "Unable to find squashed instruction in ROB\n");
-            }
-            toIEW->commitInfo[tid].squashedStreamId = fromIEW->squashedStreamId[tid];
-            toIEW->commitInfo[tid].squashedTargetId = fromIEW->squashedTargetId[tid];
-
-            // toIEW->commitInfo[tid].doneFsqId =
-            //                         toIEW->commitInfo[tid].squashInst->getFsqId();
+            toIEW->commitInfo[tid].squashInst =
+                                    rob->findInst(tid, squashed_inst);
             if (toIEW->commitInfo[tid].mispredictInst) {
                 if (toIEW->commitInfo[tid].mispredictInst->isUncondCtrl()) {
                      toIEW->commitInfo[tid].branchTaken = true;
@@ -1028,7 +1012,7 @@ Commit::commitInsts()
 
     // Commit as many instructions as possible until the commit bandwidth
     // limit is reached, or it becomes impossible to commit any more.
-    while (num_committed < commit_width) {
+    while (num_committed < commitWidth) {
         // hardware transactionally memory
         // If executing within a transaction,
         // need to handle interrupts specially
@@ -1111,13 +1095,6 @@ Commit::commitInsts()
 
                 // Set the doneSeqNum to the youngest committed instruction.
                 toIEW->commitInfo[tid].doneSeqNum = head_inst->seqNum;
-
-                if (head_inst->getFsqId() > 1) {
-                    toIEW->commitInfo[tid].doneFsqId =
-                        head_inst->getFsqId() - 1;
-                }
-                committedStreamId = head_inst->getFsqId();
-                committedTargetId = head_inst->getFtqId();
 
                 if (tid == 0)
                     canHandleInterrupts = !head_inst->isDelayedCommit();
@@ -1414,8 +1391,6 @@ Commit::commitHead(const DynInstPtr &head_inst, unsigned inst_num)
         return false;
     }
 
-    committedPC[tid] = head_inst->pcState().instAddr();
-
     updateComInstStats(head_inst);
 
     // head_inst->printDisassembly();
@@ -1552,30 +1527,15 @@ Commit::updateComInstStats(const DynInstPtr &inst)
 
     // To match the old model, don't count nops and instruction
     // prefetches towards the total commit count.
-    if ((!inst->isNop() || inst->staticInst->isMov()) &&
-        !inst->isInstPrefetch()) {
+    if (!inst->isNop() && !inst->isInstPrefetch()) {
         cpu->instDone(tid, inst);
     }
 
     //
     //  Control Instructions
     //
-    //
-    if (inst->isControl()) {
-        std::unique_ptr<PCStateBase> tmp_next_pc(inst->pcState().clone());
-        inst->staticInst->advancePC(*tmp_next_pc);
-        // add if taken
-        if (tmp_next_pc->instAddr() != inst->fallThruPC) {
-            BranchInfo temp = {inst->pcState().instAddr(),
-                               tmp_next_pc->instAddr()};
-            if (branchLog.size() >= 20) {
-                branchLog.pop_front();
-            }
-            branchLog.push_back(temp);
-        }
-
+    if (inst->isControl())
         stats.branches[tid]++;
-    }
 
     //
     //  Memory references

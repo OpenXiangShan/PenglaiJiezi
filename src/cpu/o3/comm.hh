@@ -137,8 +137,6 @@ struct IEWStruct
     DynInstPtr mispredictInst[MaxThreads];
     Addr mispredPC[MaxThreads];
     InstSeqNum squashedSeqNum[MaxThreads];
-    uint64_t squashedStreamId[MaxThreads];
-    uint64_t squashedTargetId[MaxThreads];
     std::unique_ptr<PCStateBase> pc[MaxThreads];
 
     bool squash[MaxThreads];
@@ -225,7 +223,6 @@ struct TimeStruct
         /// instruction for a branch mispredict, but the same instruction for
         /// order violation and the like
         std::unique_ptr<PCStateBase> pc; // *F
-        Addr committedPC; // *F for trap squash
 
         /// Provide fetch the instruction that mispredicted, if this
         /// pointer is not-null a misprediction occured
@@ -247,14 +244,9 @@ struct TimeStruct
         /// retired or squashed sequence number.
         InstSeqNum doneSeqNum; // *F, I
 
-        uint64_t doneFsqId; // F
-        uint64_t squashedStreamId; // F
-        uint64_t squashedTargetId; // F
-
         /// Tell Rename how many free entries it has in the ROB
         unsigned freeROBEntries; // *R
 
-        bool isTrapSquash;
         bool squash; // *F, D, R, I
         bool robSquashing; // *F, D, R, I
 

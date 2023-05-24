@@ -130,11 +130,6 @@ class Commit
     ProbePointArg<DynInstPtr> *ppCommitStall;
     /** To probe when an instruction is squashed */
     ProbePointArg<DynInstPtr> *ppSquash;
-    struct BranchInfo {
-      Addr pc=0;
-      Addr target=0;
-    };
-    std::list<BranchInfo> branchLog;
 
     /** Mark the thread as processing a trap. */
     void processTrapEvent(ThreadID tid);
@@ -432,8 +427,6 @@ class Commit
      */
     std::unique_ptr<PCStateBase> pc[MaxThreads];
 
-    Addr committedPC[MaxThreads];
-
     /** The sequence number of the youngest valid instruction in the ROB. */
     InstSeqNum youngestSeqNum[MaxThreads];
 
@@ -471,11 +464,6 @@ class Commit
     // HTM
     int htmStarts[MaxThreads];
     int htmStops[MaxThreads];
-
-    // committed Stream and Target
-
-    uint64_t committedStreamId{};
-    uint64_t committedTargetId{};
 
     struct CommitStats : public statistics::Group
     {

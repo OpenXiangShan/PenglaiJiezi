@@ -293,16 +293,7 @@ class ROB
     std::list<DynInstPtr> instList[MaxThreads];
 
     /** Number of instructions that can be squashed in a single cycle. */
-    unsigned rollbackWidth;
-
-    unsigned replayWidth{6};
-
-    unsigned dynSquashWidth{6};
-
-    unsigned constSquashCycle{1};
-
-    unsigned computeDynSquashWidth(
-        unsigned uncommitted_insts, unsigned to_squash);
+    unsigned squashWidth;
 
   public:
     std::list<DynInstPtr>* getInstList(ThreadID tid){
