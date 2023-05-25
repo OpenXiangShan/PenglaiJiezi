@@ -774,22 +774,8 @@ Decode::decodeInsts(ThreadID tid)
             ++stats.branchResolved;
 
             std::unique_ptr<PCStateBase> target = inst->branchTarget();
-            auto &t = target->as<RiscvISA::PCState>();
-            auto &pred = inst->readPredTarg().as<RiscvISA::PCState>();
-            if (t.start_equals(pred) && !t.equals(pred)) {
-                inst->setPredTarg(t);
-            }
             if (*target != inst->readPredTarg()) {
                 ++stats.branchMispred;
-
-                RiscvISA::PCState cpTarget = target->clone()->as<RiscvISA::PCState>();
-                RiscvISA::PCState cpPredTarget = inst->readPredTarg().clone()->as<RiscvISA::PCState>();
-
-                if (cpTarget.instAddr() != cpPredTarget.instAddr() && cpTarget.npc() == cpPredTarget.npc()) {
-                    ++stats.mispredictedByPC;
-                } else if (cpTarget.instAddr() == cpPredTarget.instAddr() && cpTarget.npc() != cpPredTarget.npc()) {
-                    ++stats.mispredictedByNPC;
-                }
 
                 // Might want to set some sort of boolean and just do
                 // a check at the end
@@ -799,21 +785,16 @@ Decode::decodeInsts(ThreadID tid)
                 breakDecode = StallReason::InstMisPred;
 
                 DPRINTF(Decode,
-                        "[tid:%i] [sn:%llu] Updating predictions:"
-                        " Wrong predicted target: %s PredPC: %s\n",
+                        "[tid:%i] [sn:%llu] "
+                        "Updating predictions: Wrong predicted target: %s \
+                        PredPC: %s\n",
                         tid, inst->seqNum, inst->readPredTarg(), *target);
                 //The micro pc after an instruction level branch should be 0
                 inst->setPredTarg(*target);
                 break;
             }
         }
-        if (inst->isNonSpeculative() && inst->readPredTaken()) {
-            // TODO: redirect to fall thru
-            std::unique_ptr<PCStateBase> npc(inst->pcState().clone());
-            npc->as<RiscvISA::PCState>().set(inst->pcState().getFallThruPC());
-            inst->setPredTaken(false);
-            inst->setPredTarg(*npc);
-        }
+
     }
 
     for (int i = 0;i < decodeWidth;i++) {
