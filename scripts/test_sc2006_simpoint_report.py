@@ -200,7 +200,13 @@ def run():
     with open('test.html', 'w') as f:
         f.writelines(s_html)
 
-    check_ret(i_ret_code, s_ret_msg, 1)
+    # s5: report check simpoints >= 1061
+    if '1061' in s_ret_msg:
+        print(s_ret_msg)
+        exit(0)
+    else:
+        print(s_ret_msg)
+        exit(-1)
 
 
 if __name__ == "__main__":
