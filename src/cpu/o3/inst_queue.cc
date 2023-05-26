@@ -1323,19 +1323,18 @@ InstructionQueue::doSquash(ThreadID tid)
         // prevents freeing the squashed instruction's DynInst.
         // Thus, we need to manually clear out the squashed instructions'
         // heads of dependency graph.
-        if (!(squashed_inst->staticInst->isMov() && squashed_inst->isNop())) {
-            for (int dest_reg_idx = 0;
-                 dest_reg_idx < squashed_inst->numDestRegs(); dest_reg_idx++) {
-                PhysRegIdPtr dest_reg =
-                    squashed_inst->renamedDestIdx(dest_reg_idx);
-                if (dest_reg->isFixedMapping()) {
-                    continue;
-                }
-                assert(dependGraph.empty(dest_reg->flatIndex()));
-                dependGraph.clearInst(dest_reg->flatIndex());
+        for (int dest_reg_idx = 0;
+             dest_reg_idx < squashed_inst->numDestRegs();
+             dest_reg_idx++)
+        {
+            PhysRegIdPtr dest_reg =
+                squashed_inst->renamedDestIdx(dest_reg_idx);
+            if (dest_reg->isFixedMapping()){
+                continue;
             }
+            assert(dependGraph.empty(dest_reg->flatIndex()));
+            dependGraph.clearInst(dest_reg->flatIndex());
         }
-
         instList[tid].erase(squash_it--);
         ++iqStats.squashedInstsExamined;
     }
@@ -1403,12 +1402,6 @@ InstructionQueue::addToProducers(const DynInstPtr &new_inst)
     // to the producing instruction will be placed in the head node of
     // the dependency links.
     int8_t total_dest_regs = new_inst->numDestRegs();
-
-    if (new_inst->staticInst->isMov() && new_inst->isNop()) {
-        DPRINTF(IQ, "Inst[sn:%lu] %s is a mov, don't add it as producer\n",
-                new_inst->seqNum, new_inst->pcState());
-        return;
-    }
 
     for (int dest_reg_idx = 0;
          dest_reg_idx < total_dest_regs;

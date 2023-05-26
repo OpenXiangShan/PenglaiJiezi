@@ -1527,8 +1527,7 @@ Commit::updateComInstStats(const DynInstPtr &inst)
 
     // To match the old model, don't count nops and instruction
     // prefetches towards the total commit count.
-    if ((!inst->isNop() || inst->staticInst->isMov()) &&
-         !inst->isInstPrefetch()) {
+    if ( !inst->isNop() && !inst->isInstPrefetch()) {
         cpu->instDone(tid, inst);
     }
 
