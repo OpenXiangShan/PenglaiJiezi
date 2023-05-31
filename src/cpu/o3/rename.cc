@@ -1032,6 +1032,7 @@ Rename::tryFreePReg(PhysRegIdPtr preg)
                 "Not to free up p%i on squash because it has already "
                 "been freed\n",
                 preg_idx);
+        freeList->addReg(preg);
     } else if (preg->getRef() == 1) {
         preg->decRef();
         // Put the renamed physical register back on the free list.
