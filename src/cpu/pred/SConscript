@@ -41,7 +41,10 @@ SimObject('BranchPredictor.py', sim_objects=[
     'MultiperspectivePerceptronTAGE', 'MPP_StatisticalCorrector_64KB',
     'MultiperspectivePerceptronTAGE64KB', 'MPP_TAGE_8KB',
     'MPP_LoopPredictor_8KB', 'MPP_StatisticalCorrector_8KB',
-    'MultiperspectivePerceptronTAGE8KB'])
+    'MultiperspectivePerceptronTAGE8KB',
+    'BTB_DIR', 'TAGEBase_BLK', 'BTB_TAGE', 'TAGE_SC_I_BLK',
+    'DecoupledBPU', 'FTQ', 'RAS_BLK', 'ITTAGE_BLK', 'UBTB_BLK',
+    'New_SC_BLK', 'LOOP_PRED_BLK'])
 
 DebugFlag('Indirect')
 Source('bpred_unit.cc')
@@ -66,8 +69,25 @@ Source('statistical_corrector.cc')
 Source('tage_sc_l.cc')
 Source('tage_sc_l_8KB.cc')
 Source('tage_sc_l_64KB.cc')
+Source('dppred_blk/ubtb_blk.cc')
+Source('dppred_blk/btb_blk.cc')
+Source('dppred_blk/tage_base_blk.cc')
+Source('dppred_blk/btb_dir.cc')
+Source('dppred_blk/btb_tage.cc')
+Source('dppred_blk/new_sc_blk.cc')
+Source('dppred_blk/loop_pred_blk.cc')
+Source('dppred_blk/tage_sc_i_blk.cc')
+Source('dppred_blk/ittage_blk.cc')
+Source('dppred_blk/ftq.cc')
+Source('dppred_blk/DecoupledBPU.cc')
+Source('dppred_blk/ras_lk_blk.cc')
 DebugFlag('FreeList')
 DebugFlag('Branch')
 DebugFlag('Tage')
 DebugFlag('LTage')
 DebugFlag('TageSCL')
+DebugFlag('Ftq')
+DebugFlag('RAS')
+DebugFlag('Ubtb')
+DebugFlag('LoopPred')
+DebugFlag('TAGE_SC_I_BLK')
