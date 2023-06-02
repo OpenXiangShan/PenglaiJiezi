@@ -269,6 +269,7 @@ def build_test_system(np):
         test_sys.kvm_vm = KvmVM()
 
     CpuConfig.config_difftest(TestCPUClass, test_sys.cpu, args)
+    CpuConfig.config_decoupledFrontend(TestCPUClass, test_sys.cpu, args)
 
     for i in range(np):
         if args.dump_commit:

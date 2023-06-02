@@ -132,7 +132,7 @@ Fetch::Fetch(CPU *_cpu, const BaseO3CPUParams &params)
         issuePipelinedIfetch[i] = false;
     }
 
-    branchPred = params.branchPred;
+    branchPred = (branch_prediction::BPredUnit*)params.branchPred;
 
     for (ThreadID tid = 0; tid < numThreads; tid++) {
         decoder[tid] = params.decoder[tid];

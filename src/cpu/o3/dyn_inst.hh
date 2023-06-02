@@ -241,6 +241,8 @@ class DynInst : public ExecContext, public RefCounted
     // Whether or not the source register is ready, one bit per register.
     uint8_t *_readySrcIdx;
 
+    // compressed inst or not
+    bool _compressed = false;
   public:
     size_t numSrcs() const { return _numSrcs; }
     size_t numDests() const { return _numDests; }
@@ -547,10 +549,15 @@ class DynInst : public ExecContext, public RefCounted
     bool
     mispredicted()
     {
+        bool dir_mispred = (!readPredTaken() && isUncondCtrl());
         std::unique_ptr<PCStateBase> next_pc(pc->clone());
         staticInst->advancePC(*next_pc);
-        return *next_pc != *predPC;
+        return (*next_pc != *predPC) || dir_mispred;
     }
+
+    // compressed inst flag set and read
+    void compressed(bool c) { _compressed = c; }
+    bool compressed() const { return _compressed; }
 
     //
     //  Instruction types.  Forward checks to StaticInst object.

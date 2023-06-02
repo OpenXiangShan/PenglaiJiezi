@@ -60,6 +60,7 @@
 #include "cpu/o3/decode.hh"
 #include "cpu/o3/dyn_inst_ptr.hh"
 #include "cpu/o3/fetch.hh"
+#include "cpu/o3/fetch_top.hh"
 #include "cpu/o3/free_list.hh"
 #include "cpu/o3/iew.hh"
 #include "cpu/o3/limits.hh"
@@ -67,6 +68,7 @@
 #include "cpu/o3/rob.hh"
 #include "cpu/o3/scoreboard.hh"
 #include "cpu/o3/thread_state.hh"
+#include "cpu/pred/dppred_blk/DecoupledBPU.hh"
 #include "cpu/simple_thread.hh"
 #include "cpu/timebuf.hh"
 #include "params/BaseO3CPU.hh"
@@ -167,6 +169,12 @@ class CPU : public BaseCPU
 
     /** Check if a system is in a drained state. */
     bool isCpuDrained() const;
+
+    /** Sets the main backwards communication time buffer pointer. */
+    void setTimeBuffer(TimeBuffer<TimeStruct> *time_buffer);
+
+    /** Checks Squashes signals and updates inst status.*/
+    void checkSignalsAndUpdate(ThreadID tid);
 
   public:
     /** Constructs a CPU with the given parameters. */
@@ -370,6 +378,9 @@ class CPU : public BaseCPU
     /** Removes the instruction pointed to by the iterator. */
     void squashInstIt(const ListIt &instIt, ThreadID tid);
 
+    /** Set squashed and remove an instruction. */
+    void squashAndremoveInst(const DynInstPtr &inst);
+
     // flush fetch buffer while flushing tlb
     void flushTLBs() override;
 
@@ -409,9 +420,11 @@ class CPU : public BaseCPU
      */
     bool removeInstsThisCycle;
 
+    bool enDecoupleFrontend;
+
   protected:
     /** The fetch stage. */
-    Fetch fetch;
+    FetchTop fetch;
 
     /** The decode stage. */
     Decode decode;
@@ -492,6 +505,13 @@ class CPU : public BaseCPU
      */
     ActivityRecorder activityRec;
 
+    /** Wire to get decode's information from backwards time buffer. */
+    TimeBuffer<TimeStruct>::wire fromDecode;
+
+    /** Wire to get commit's information from backwards time buffer. */
+    TimeBuffer<TimeStruct>::wire fromCommit;
+
+    const int squashSingleDelay = 1;
   public:
     /** Records that there was time buffer activity this cycle. */
     void activityThisCycle() { activityRec.activity(); }
@@ -635,6 +655,12 @@ class CPU : public BaseCPU
 
     //difftest virtual function
     void readGem5Regs();
+
+    // gen pcState pointer from address
+    gem5::PCStateBase *newPCState(Addr address)
+    {
+        return isa.at(0)->newPCState(address);
+    }
 };
 
 } // namespace o3
