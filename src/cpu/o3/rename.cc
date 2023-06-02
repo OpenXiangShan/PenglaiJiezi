@@ -794,6 +794,7 @@ Rename::renameInsts(ThreadID tid)
 
             serializeAfter(insts_to_rename, tid);
         }
+
         renameSrcRegs(inst, inst->threadNumber);
 
         renameDestRegs(inst, inst->threadNumber);
@@ -1051,7 +1052,6 @@ Rename::doSquash(const InstSeqNum &squashed_seq_num, ThreadID tid)
             // Tell the rename map to set the architected register to the
             // previous physical register that it was renamed to.
             renameMap[tid]->setEntry(hb_it->archReg, hb_it->prevPhysReg);
-
             // Put the renamed physical register back on the free list.
             freeList->addReg(hb_it->newPhysReg);
         }
@@ -1157,9 +1157,10 @@ Rename::renameSrcRegs(const DynInstPtr &inst, ThreadID tid)
 
         DPRINTF(Rename,
                 "[tid:%i] "
-                "Looking up %s arch reg x%i, got p%i\n",
+                "Looking up %s arch reg %i, got phys reg %i (%s)\n",
                 tid, src_reg.className(),
-                src_reg.index(), renamed_reg->flatIndex());
+                src_reg.index(), renamed_reg->index(),
+                renamed_reg->className());
 
         inst->renameSrcReg(src_idx, renamed_reg);
 

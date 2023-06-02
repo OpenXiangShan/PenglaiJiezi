@@ -1208,10 +1208,10 @@ class DynInst : public ExecContext, public RefCounted
     void printDisassembly() const
     {
         DPRINTF(CommitTrace,
-                "[sn:%lu] pc:%#lx %s, rdy: %lu, comp: %lu, addr: %#lx\n",
-                seqNum, pcState().instAddr(),
+                "[sn:%lu] pc:%#lx %s, complete at %lu, addr: %#lx\n", seqNum,
+                pcState().instAddr(),
                 staticInst->disassemble(pcState().instAddr()).c_str(),
-                readyTick, completionTick, physEffAddr);
+                completionTick, physEffAddr);
     }
     void
     setFsqId(unsigned id)

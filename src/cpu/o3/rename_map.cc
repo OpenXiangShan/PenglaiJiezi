@@ -70,7 +70,7 @@ SimpleRenameMap::init(const RegClass &reg_class, SimpleFreeList *_freeList)
 }
 
 SimpleRenameMap::RenameInfo
-SimpleRenameMap::rename(const RegId& arch_reg)
+SimpleRenameMap::rename(const RegId &arch_reg)
 {
     PhysRegIdPtr renamed_reg;
     // Record the current physical register that is renamed to the
