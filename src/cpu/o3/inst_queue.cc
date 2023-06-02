@@ -1323,17 +1323,17 @@ InstructionQueue::doSquash(ThreadID tid)
         // prevents freeing the squashed instruction's DynInst.
         // Thus, we need to manually clear out the squashed instructions'
         // heads of dependency graph.
-        for (int dest_reg_idx = 0;
-             dest_reg_idx < squashed_inst->numDestRegs();
-             dest_reg_idx++)
-        {
-            PhysRegIdPtr dest_reg =
-                squashed_inst->renamedDestIdx(dest_reg_idx);
-            if (dest_reg->isFixedMapping()){
-                continue;
+        if (!(squashed_inst->staticInst->isMov() && squashed_inst->isNop())) {
+            for (int dest_reg_idx = 0;
+                 dest_reg_idx < squashed_inst->numDestRegs(); dest_reg_idx++) {
+                PhysRegIdPtr dest_reg =
+                    squashed_inst->renamedDestIdx(dest_reg_idx);
+                if (dest_reg->isFixedMapping()) {
+                    continue;
+                }
+                assert(dependGraph.empty(dest_reg->flatIndex()));
+                dependGraph.clearInst(dest_reg->flatIndex());
             }
-            assert(dependGraph.empty(dest_reg->flatIndex()));
-            dependGraph.clearInst(dest_reg->flatIndex());
         }
 
         instList[tid].erase(squash_it--);
@@ -1404,11 +1404,11 @@ InstructionQueue::addToProducers(const DynInstPtr &new_inst)
     // the dependency links.
     int8_t total_dest_regs = new_inst->numDestRegs();
 
-    // if (new_inst->staticInst->isMov()) {
-    //     DPRINTF(IQ, "Inst[sn:%lu] %s is a mov, don't add it as producer\n",
-    //             new_inst->seqNum, new_inst->pcState());
-    //     return;
-    // }
+    if (new_inst->staticInst->isMov() && new_inst->isNop()) {
+        DPRINTF(IQ, "Inst[sn:%lu] %s is a mov, don't add it as producer\n",
+                new_inst->seqNum, new_inst->pcState());
+        return;
+    }
 
     for (int dest_reg_idx = 0;
          dest_reg_idx < total_dest_regs;
@@ -1424,12 +1424,16 @@ InstructionQueue::addToProducers(const DynInstPtr &new_inst)
 
         if (!dependGraph.empty(dest_reg->flatIndex())) {
             dependGraph.dump();
-            panic("Dependency graph %i (%s) (flat: %i) not empty!",
+            panic("Dependency graph %i (%s) (flat: %i) not empty on add producer sn:%lu!",
                   dest_reg->index(), dest_reg->className(),
-                  dest_reg->flatIndex());
+                  dest_reg->flatIndex(), new_inst->seqNum);
         }
 
         dependGraph.setInst(dest_reg->flatIndex(), new_inst);
+        DPRINTF(IQ, "Instruction sn:%lu has dest reg %i (%i) that "
+                "is being added as the producer.\n",
+                new_inst->seqNum, dest_reg->index(),
+                dest_reg->flatIndex());
 
         // Mark the scoreboard to say it's not yet ready.
         regScoreboard[dest_reg->flatIndex()] = false;
@@ -1466,7 +1470,7 @@ InstructionQueue::addIfReady(const DynInstPtr &inst)
                 inst->pcState(), op_class, inst->seqNum);
 
         if (inst->readyTick == -1)
-           inst->readyTick = curTick();
+            inst->readyTick = curTick();
         readyInsts[op_class].push(inst);
 
         // Will need to reorder the list if either a queue is not on the list,
