@@ -62,8 +62,6 @@
 #include "sim/eventq.hh"
 #include "sim/probe/probe.hh"
 
-#define INST_PREFETCH_EN 0
-
 namespace gem5
 {
 
@@ -239,6 +237,9 @@ class FetchStage
     ProbePointArg<DynInstPtr> *ppFetch;
     /** To probe when a fetch request is successfully sent. */
     ProbePointArg<RequestPtr> *ppFetchRequestSent;
+
+    /** Enable inst prefetch **/
+    bool enInstPrefetch;
 
   public:
     /** Fetch constructor. */

@@ -143,6 +143,7 @@ FetchStage::FetchStage(CPU *_cpu, const BaseO3CPUParams &params)
     }
 
     branchPred = (DecoupledBPU *)params.decoupledBPU;
+    enInstPrefetch= params.instPrefetch;
 
     assert(params.decoder.size());
     for (ThreadID tid = 0; tid < numThreads; tid++) {
@@ -659,13 +660,14 @@ FetchStage::fetchCacheLine(Addr vaddr, ThreadID tid,
         flag_type, cpu->instRequestorId(), pc,
         cpu->thread[tid]->contextId());
 
-#if INST_PREFETCH_EN
-    if (is_prefetch) {
+#if 0 // TODO
+    if (enInstPrefetch && is_prefetch) {
       mem_req->setCacheOrgId(0);// id=0:iCache
                                 // TODO, from icache->getCacheOrgId()
       mem_req->setPrefetchTgtId(2); // id=2:L2
     }
 #endif
+
     mem_req->taskId(cpu->taskId());
     pushReqToList(mem_req, this_pc);
     DPRINTF(Fetch, "[tid:%i] Fetching cache line new req: %x\n",
@@ -1616,9 +1618,8 @@ FetchStage::tick0()
     }
 
     // proc prefetch
-#if INST_PREFETCH_EN
     FtqPrefetchInfo& prefetch_info = new_ftq_info.instBlkPrefetchInfo;
-    if (prefetch_info.valid) {
+    if (enInstPrefetch && prefetch_info.valid) {
         DPRINTF(Fetch, "Get prefetch ftq info, startAddr:%x \n",
                   prefetch_info.startAddr);
         auto& ftq_info = ftqFetchInfoBuffer.front();
@@ -1650,7 +1651,6 @@ FetchStage::tick0()
             }
         }
     }
-#endif
 
     // send req to F1
     std::vector<FetchReqStatus> f0_finish_stat = {

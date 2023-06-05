@@ -181,3 +181,4 @@ class BaseO3CPU(BaseCPU):
     )
     decoupledBPU = Param.DecoupledBPU(DecoupledBPU(), "DecoupledBPU object")
     needsTSO = Param.Bool(False, "Enable TSO Memory model")
+    instPrefetch = Param.Bool(False, "Enable inst prefetch")

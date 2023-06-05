@@ -70,8 +70,8 @@ def config_difftest(cpu_cls, cpu_list, options):
         cpu_list[0].difftest_ref_so = options.difftest_ref_so
 
 def config_decoupledFrontend(cpu_cls, cpu_list, options):
-    if not options.enable_decoupledFrontend:
-        return
-    else:
-        assert len(cpu_list) == 1
+    assert len(cpu_list) == 1
+    if not options.disable_decoupledFrontend:
         cpu_list[0].enable_decoupledFrontend = True
+    else:
+        cpu_list[0].enable_decoupledFrontend = False
