@@ -37,6 +37,7 @@ FetchTop::FetchTop(CPU *_cpu, const BaseO3CPUParams &params)
         takeOverFrom = [&](void) {fetch.takeOverFrom();};
         flushFetchBuffer = [&](void) {fetch.flushFetchBuffer();};
     } else {
+        std::cout << "use GEM5 frontend " << std::endl;
         pFetch = std::make_shared<Fetch>(_cpu, params);
         Fetch& fetch = *pFetch;
         tick = [&](void) {fetch.tick();};

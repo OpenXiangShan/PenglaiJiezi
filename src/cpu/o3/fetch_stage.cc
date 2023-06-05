@@ -142,7 +142,7 @@ FetchStage::FetchStage(CPU *_cpu, const BaseO3CPUParams &params)
         issuePipelinedIfetch[i] = false;
     }
 
-    branchPred = (DecoupledBPU *)params.branchPred;//decoupledBPU;
+    branchPred = (DecoupledBPU *)params.decoupledBPU;
 
     assert(params.decoder.size());
     for (ThreadID tid = 0; tid < numThreads; tid++) {

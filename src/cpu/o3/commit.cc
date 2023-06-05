@@ -131,6 +131,8 @@ Commit::Commit(CPU *_cpu, const BaseO3CPUParams &params)
         trapSquash[tid] = false;
         tcSquash[tid] = false;
         squashAfterInst[tid] = nullptr;
+        squashInterruptInst[tid] = nullptr;
+        squashInst[tid] = nullptr;
         pc[tid].reset(params.isa[0]->newPCState());
         youngestSeqNum[tid] = 0;
         lastCommitedSeqNum[tid] = 0;
@@ -371,6 +373,8 @@ Commit::clearStates(ThreadID tid)
     pc[tid].reset(cpu->tcBase(tid)->getIsaPtr()->newPCState());
     lastCommitedSeqNum[tid] = 0;
     squashAfterInst[tid] = NULL;
+    squashInterruptInst[tid] = NULL;
+    squashInst[tid] = NULL;
 }
 
 void Commit::drain() { drainPending = true; }
@@ -435,6 +439,8 @@ Commit::takeOverFrom()
         trapSquash[tid] = false;
         tcSquash[tid] = false;
         squashAfterInst[tid] = NULL;
+        squashInterruptInst[tid] = NULL;
+        squashInst[tid] = NULL;
     }
     rob->takeOverFrom();
 }
@@ -588,6 +594,7 @@ Commit::squashAll(ThreadID tid)
 
     toIEW->commitInfo[tid].mispredictInst = NULL;
     toIEW->commitInfo[tid].squashInst = NULL;
+    toIEW->commitInfo[tid].squashItSelf = NULL;
 
     set(toIEW->commitInfo[tid].pc, pc[tid]);
 }
@@ -604,7 +611,39 @@ Commit::squashFromTrap(ThreadID tid)
     trapInFlight[tid] = false;
 
     trapSquash[tid] = false;
+    // for interrupt
+    if (squashInterruptInst[tid])
+        DPRINTF(Commit, "squashInterruptInst[tid]->PC %s\n",
+            squashInterruptInst[tid]->pcState());
+    else
+        DPRINTF(Commit, "squashInterruptInst[tid] is null\n");
+    toIEW->commitInfo[tid].squashInst = squashInterruptInst[tid];
+    squashInterruptInst[tid] = NULL;
 
+    // different trap may squashItSelf or not,
+    // see the riscv/faults.cc
+    toIEW->commitInfo[tid].squashItSelf = squashItSelf[tid];
+    squashItSelf[tid] = false;
+
+
+    // other faults will re-execute again, like inst A invoke TLB fault,
+    // A will execute again, and will commit at last,
+    // only syscall inst will not execute again.
+    if (squashInst[tid]->isSyscall()) {
+        DPRINTF(Commit, "In %s, give fault inst %s to fetch\n",
+            __func__,
+            squashInst[tid]->pcState());
+        // Set the doneSeqNum to the youngest committed instruction.
+        toIEW->commitInfo[tid].doneSeqNum = squashInst[tid]->seqNum;
+        toIEW->commitInfo[tid].squashInst = squashInst[tid];
+        // Set the cmtInfo to tell Fetch to
+        // update its internal structure
+        toIEW->commitInfo[tid].cmtInfo.push_back(squashInst[tid]);
+        toIEW->commitInfo[tid].squashItSelf = false;
+    }
+
+
+    squashInst[tid] = NULL;
     commitStatus[tid] = ROBSquashing;
     cpu->activityThisCycle();
 }
@@ -618,6 +657,9 @@ Commit::squashFromTC(ThreadID tid)
 
     thread[tid]->noSquashFromTC = false;
     assert(!thread[tid]->trapPending);
+
+    toIEW->commitInfo[tid].squashInst = rob->readHeadInst(tid);
+    toIEW->commitInfo[tid].squashItSelf = false;
 
     commitStatus[tid] = ROBSquashing;
     cpu->activityThisCycle();
@@ -635,7 +677,15 @@ Commit::squashFromSquashAfter(ThreadID tid)
     // Make sure to inform the fetch stage of which instruction caused
     // the squash. It'll try to re-fetch an instruction executing in
     // microcode unless this is set.
+
+    // for squashAfter squash, send commmit info to fetch with the squash
+    // info together.
+    //commit info
+    toIEW->commitInfo[tid].doneSeqNum = squashAfterInst[tid]->seqNum;
+    toIEW->commitInfo[tid].cmtInfo.push_back(squashAfterInst[tid]);
+    //squash info
     toIEW->commitInfo[tid].squashInst = squashAfterInst[tid];
+    toIEW->commitInfo[tid].squashItSelf = false;
     squashAfterInst[tid] = NULL;
 
     commitStatus[tid] = ROBSquashing;
@@ -651,6 +701,8 @@ Commit::squashAfter(ThreadID tid, const DynInstPtr &head_inst)
     assert(!squashAfterInst[tid] || squashAfterInst[tid] == head_inst);
     commitStatus[tid] = SquashAfterPending;
     squashAfterInst[tid] = head_inst;
+    squashInst[tid] = head_inst;
+    squashItSelf[tid] = false;
 }
 
 void
@@ -911,11 +963,24 @@ Commit::commit()
                 fromIEW->branchTaken[tid];
             toIEW->commitInfo[tid].squashInst =
                                     rob->findInst(tid, squashed_inst);
+            toIEW->commitInfo[tid].squashItSelf = true;
             if (toIEW->commitInfo[tid].mispredictInst) {
                 if (toIEW->commitInfo[tid].mispredictInst->isUncondCtrl()) {
                      toIEW->commitInfo[tid].branchTaken = true;
                 }
                 ++stats.branchMispredicts;
+                toIEW->commitInfo[tid].squashInst = \
+                    toIEW->commitInfo[tid].mispredictInst;
+                toIEW->commitInfo[tid].squashItSelf = false;
+            }
+
+            // squashed_inst is the seqNum before the inst which
+            // invoke the squash when squashItSelf is true,
+            // the frontend pipeline need the specific inst which invoke
+            // the squash itself, so it is squashed_inst + 1
+            if (toIEW->commitInfo[tid].squashItSelf) {
+                toIEW->commitInfo[tid].squashInst =
+                    rob->findInst(tid, squashed_inst+1);
             }
 
             set(toIEW->commitInfo[tid].pc, fromIEW->pc[tid]);
@@ -987,6 +1052,11 @@ Commit::commitInsts()
     // it is writing in during this cycle.  Can't commit and squash
     // things at the same time...
     ////////////////////////////////////
+
+    // erase all the insts in the cmtInfo, they are
+    // commited the in the last cycle
+    ThreadID commit_thread_tmp = getCommittingThread();
+    toIEW->commitInfo[commit_thread_tmp].cmtInfo.clear();
 
     DPRINTF(Commit, "Trying to commit instructions in the ROB.\n");
 
@@ -1065,6 +1135,18 @@ Commit::commitInsts()
             changedROBNumEntries[tid] = true;
         } else {
             set(pc[tid], head_inst->pcState());
+            // Consider a situation: after WFI there is no inst
+            // in the pipeline, we still need return an inst to Fetch
+            // So, whether there is an interruption or not
+            // record the head_inst.
+            squashInterruptInst[0] = head_inst;
+            squashInst[0] = head_inst;
+            if (interrupt != NoFault) {
+                DPRINTF(Commit, "squashInterruptInst[0]->pc:%s\n",
+                    squashInterruptInst[0]->pcState());
+                // instruction that encounter interrupt will be committed
+                squashItSelf[0] = false;
+            }
 
             // Try to commit the head instruction.
             bool commit_success = commitHead(head_inst, num_committed);
@@ -1093,8 +1175,17 @@ Commit::commitInsts()
 
                 changedROBNumEntries[tid] = true;
 
-                // Set the doneSeqNum to the youngest committed instruction.
-                toIEW->commitInfo[tid].doneSeqNum = head_inst->seqNum;
+                //Fetch need to receive squashAfter squash not later than
+                // commit info, so when met squashAfter squash, commit
+                // the inst in squashFromSquashAfter
+                //NOTE: should not conflict with the next cycle's commit inst.
+                if (!head_inst->isSquashAfter()) {
+                    // Set to the youngest committed instruction.
+                    toIEW->commitInfo[tid].doneSeqNum = head_inst->seqNum;
+                    // Set the cmtInfo to tell Fetch to
+                    // update its internal structure
+                    toIEW->commitInfo[tid].cmtInfo.push_back(head_inst);
+                }
 
                 if (tid == 0)
                     canHandleInterrupts = !head_inst->isDelayedCommit();
@@ -1285,6 +1376,30 @@ Commit::commitHead(const DynInstPtr &head_inst, unsigned inst_num)
     if (inst_fault != NoFault) {
         DPRINTF(Commit, "Inst [tid:%i] [sn:%llu] PC %s has a fault\n",
                 tid, head_inst->seqNum, head_inst->pcState());
+
+        // ftq need the information of committed
+        // trap (ecall/interrupt) inst.
+        squashInst[tid] = head_inst;
+        DPRINTF(Commit, "In %s, fault inst is %s, ftqIdx:%d\n",
+                __func__,
+                squashInst[tid]->pcState(),
+                head_inst->ftqIdx);
+
+        std::string inst_fault_basestr = "instruction";
+        std::string inst_fault_name = inst_fault->name();
+
+        // faults that related instruction should squash itself,
+        // other faults like address/Syscall faults should not.
+        // if (inst_fault_name.find (inst_fault_basestr) != std::string::npos)
+        //    squashItSelf[tid] = true;
+        //else
+        //    squashItSelf[tid] = false;
+
+        // currently all faults will invoke squash and will squashItSelf
+        // InterruptFault, Reset, NonMaskableInterruptFault,
+        //InstFault(UnknownInstFault, IllegalInstFault、UnimplementedFault,
+        // IllegalFrmFault) AddressFault, BreakpointFault, SyscallFault
+        squashItSelf[tid] = true;
 
         if (iewStage->hasStoresToWB(tid) || inst_num > 0) {
             DPRINTF(Commit,
