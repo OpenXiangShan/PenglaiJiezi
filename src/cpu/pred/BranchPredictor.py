@@ -1051,8 +1051,8 @@ class RAS_BLK(SimObject):
     cxx_class = 'gem5::branch_prediction::RAS_BLK'
     cxx_header = "cpu/pred/dppred_blk/ras_lk_blk.hh"
 
-    numEntries = Param.Unsigned(64, "Number of ras stack entrys")
-    ctrWidth = Param.Unsigned(1, "Width of ras entry ctr")
+    numSpecEntries = Param.Unsigned(64, "Number of ras spec stack entrys")
+    numCmtEntries = Param.Unsigned(32, "Number of ras commit stack entrys")
 
 class New_SC_BLK(SimObject):
     type = 'New_SC_BLK'
