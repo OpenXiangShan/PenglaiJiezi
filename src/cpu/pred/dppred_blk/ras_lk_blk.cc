@@ -1,5 +1,4 @@
 #include "cpu/pred/dppred_blk/ras_lk_blk.hh"
-
 #include "debug/RAS.hh"
 
 namespace gem5 {
@@ -7,30 +6,44 @@ namespace branch_prediction {
 
 RAS_BLK::RAS_BLK(const RAS_BLKParams &p)
     : SimObject(p),
-    numEntries(p.numEntries),
-    ctrWidth(p.ctrWidth)
+    numSpecEntries(p.numSpecEntries),
+    numCmtEntries(p.numCmtEntries)
 {
-    wr_idx = 0;
-    top_idx = 0;
-    stack.resize(numEntries);
-    maxCtr = (1 << ctrWidth) - 1;
-    for (auto &entry : stack) {
+    ls_wr_idx = 0;
+    ls_top_idx = 0;
+    cs_cmt_top_idx = numCmtEntries-1;
+    cs_spec_top_idx = numCmtEntries-1;
+    lk_stack.resize(numSpecEntries);
+    cmt_stack.resize(numCmtEntries);
+    for (auto &entry : lk_stack) {
+        entry.valid = false;
         entry.next_top_idx = 0;
+        entry.retAddr = 0x80000000L;
+    }
+    for (auto &entry : cmt_stack) {
         entry.retAddr = 0x80000000L;
     }
 }
 
 Addr
 RAS_BLK::getRetAddr(Meta *rasMeta){
-    return rasMeta->tos.retAddr;
+    return rasMeta->top_retAddr;
 }
 
 RAS_BLK::Meta *RAS_BLK::createMeta()
 {
-    Meta* meta_ptr = new Meta;
-    meta_ptr->top_idx = top_idx;
-    meta_ptr->wr_idx = wr_idx;
-    meta_ptr->tos = stack[top_idx];
+    Meta* meta_ptr = new Meta(numSpecEntries);
+    meta_ptr->ls_top_idx = ls_top_idx;
+    meta_ptr->ls_wr_idx = ls_wr_idx;
+    meta_ptr->cs_spec_top_idx = cs_spec_top_idx;
+    if (lk_stack[ls_top_idx].valid){
+        meta_ptr->top_retAddr = lk_stack[ls_top_idx].retAddr;
+    }else{
+        meta_ptr->top_retAddr = cmt_stack[cs_spec_top_idx].retAddr;
+    }
+    for (unsigned i = 0; i < numSpecEntries; ++i){
+        meta_ptr->stack_valid[i] = lk_stack[i].valid;
+    }
     return meta_ptr;
 }
 
@@ -38,7 +51,11 @@ RAS_BLK::Meta *RAS_BLK::createMeta()
 Addr
 RAS_BLK::getRasTopAddr()
 {
-    return stack[top_idx].retAddr;
+    if (lk_stack[ls_top_idx].valid){
+        return lk_stack[ls_top_idx].retAddr;
+    }else{
+        return cmt_stack[cs_spec_top_idx].retAddr;
+    }
 }
 
 void
@@ -52,7 +69,6 @@ RAS_BLK::specUpdate(bool isCall, bool isRet, Addr pushAddr)
     if (isCall) {
         push(pushAddr);
     }
-    printStack("after specUpdate");
 }
 
 void
@@ -78,12 +94,13 @@ void
 RAS_BLK::squash_recover(Meta *recoverRasMeta, bool isCall,
                     bool isRet, Addr pushAddr)
 {
-    printStack("before recover");
     // recover sp and tos first
-    top_idx = recoverRasMeta->top_idx;
-    wr_idx = recoverRasMeta->wr_idx;
-
-    printStack("after recover");
+    ls_top_idx = recoverRasMeta->ls_top_idx;
+    ls_wr_idx = recoverRasMeta->ls_wr_idx;
+    cs_spec_top_idx = recoverRasMeta->cs_spec_top_idx;
+    for (unsigned i = 0; i < numSpecEntries; ++i){
+        lk_stack[i].valid = recoverRasMeta->stack_valid[i];
+    }
 
     // do push & pops on control squash
     if (isRet) {
@@ -96,41 +113,65 @@ RAS_BLK::squash_recover(Meta *recoverRasMeta, bool isCall,
         DPRINTF(RAS, "push addr is %x\n", pushAddr);
         push(pushAddr);
     }
-    printStack("after recover update");
+}
+
+void
+RAS_BLK::commit(Addr pushAddr, bool isCall, bool isRet)
+{
+    if (isCall){
+        ptrInc(cs_cmt_top_idx, false);
+        cmt_stack[cs_cmt_top_idx].retAddr = pushAddr;
+        DPRINTF(RAS, "call commit\n");
+    }else if (isRet){
+        ptrDec(cs_cmt_top_idx, false);
+        DPRINTF(RAS, "ret commit\n");
+    }
 }
 
 
 void
 RAS_BLK::push(Addr retAddr)
 {
-    // push new entry
-    stack[wr_idx].retAddr = retAddr;
-    stack[wr_idx].next_top_idx = top_idx;
-    top_idx = wr_idx;
-    ptrInc(wr_idx);
+    lk_stack[ls_wr_idx].retAddr = retAddr;
+    lk_stack[ls_wr_idx].next_top_idx = ls_top_idx;
+    lk_stack[ls_wr_idx].valid = true;
+    ls_top_idx = ls_wr_idx;
+    ptrInc(ls_wr_idx, true);
+    ptrInc(cs_spec_top_idx, false);
 }
 
 void
 RAS_BLK::pop()
 {
-    auto& tos = stack[top_idx];
-    top_idx = tos.next_top_idx;
+    auto& tos = lk_stack[ls_top_idx];
+    if (tos.valid){
+        tos.valid = false;
+        ls_top_idx = tos.next_top_idx;
+    }
+    ptrDec(cs_spec_top_idx, false);
 }
 
 void
-RAS_BLK::ptrInc(unsigned &ptr)
+RAS_BLK::ptrInc(unsigned &ptr, bool isSpecStack)
 {
-    ptr = (ptr + 1) % numEntries;
+    if (isSpecStack){
+        ptr = (ptr + 1) % numSpecEntries;
+    }else{
+        ptr = (ptr + 1) % numCmtEntries;
+    }
 }
 
 void
-RAS_BLK::ptrDec(unsigned &ptr)
+RAS_BLK::ptrDec(unsigned &ptr, bool isSpecStack)
 {
     if (ptr > 0) {
         ptr--;
     } else {
-        assert(ptr == 0);
-        ptr = numEntries - 1;
+        if (isSpecStack){
+            ptr = numSpecEntries - 1;
+        }else{
+            ptr = numCmtEntries - 1;
+        }
     }
 }
 

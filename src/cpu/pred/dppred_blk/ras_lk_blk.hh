@@ -20,18 +20,31 @@ class RAS_BLK : public SimObject
 
         RAS_BLK(const RAS_BLKParams &p);
 
-        struct RASEntry
+        struct RASSpecEntry
         {
+            bool valid;
             Addr retAddr;
             unsigned next_top_idx;
-            RASEntry() : retAddr(0), next_top_idx(0) {}
+            RASSpecEntry() : valid(false), retAddr(0),
+                            next_top_idx(0) {}
+        };
+
+        struct RASCmtEntry
+        {
+            Addr retAddr;
+            RASCmtEntry() : retAddr(0) {}
         };
 
         struct Meta
         {
-            unsigned wr_idx;
-            unsigned top_idx;
-            RASEntry tos;
+            unsigned ls_wr_idx;
+            unsigned ls_top_idx;
+            unsigned cs_spec_top_idx;
+            Addr top_retAddr;
+            std::vector<bool> stack_valid;
+            Meta(unsigned numSpecEntries){
+                stack_valid.resize(numSpecEntries);
+            }
         };
 
         Addr getRetAddr(Meta *rasMeta);
@@ -47,6 +60,8 @@ class RAS_BLK : public SimObject
         void squash_recover(Meta *recoverRasMeta, bool isCall,
                         bool isRet, Addr pushAddr);
 
+        void commit(Addr pushAddr, bool isCall, bool isRet);
+
         void free_mem(Meta * &meta_ptr);
 
     private:
@@ -55,35 +70,20 @@ class RAS_BLK : public SimObject
 
         void pop();
 
-        void ptrInc(unsigned &ptr);
+        void ptrInc(unsigned &ptr, bool isSpecStack);
 
-        void ptrDec(unsigned &ptr);
+        void ptrDec(unsigned &ptr, bool isSpecStack);
 
-        void printStack(const char *when) {
-            DPRINTF(RAS, "printStack when %s: \n", when);
-            for (unsigned i = 0; i < numEntries; i++) {
-                DPRINTFR(RAS, "entry [%d], retAddr %#lx",
-                            i, stack[i].retAddr);
-                if (top_idx == i) {
-                    DPRINTFR(RAS, " <-- top_idx");
-                }
-                if (wr_idx == i) {
-                    DPRINTFR(RAS, " <-- wr_idx");
-                }
-                DPRINTFR(RAS, "\n");
-            }
-        }
+        unsigned numSpecEntries;
+        unsigned numCmtEntries;
 
-        unsigned numEntries;
+        unsigned ls_wr_idx;
+        unsigned ls_top_idx;
+        unsigned cs_cmt_top_idx;
+        unsigned cs_spec_top_idx;
 
-        unsigned ctrWidth;
-
-        int maxCtr;
-
-        unsigned wr_idx;
-        unsigned top_idx;
-
-        std::vector<RASEntry> stack;
+        std::vector<RASSpecEntry> lk_stack;  //spec link stack
+        std::vector<RASCmtEntry> cmt_stack;  //cmt stack
 };
 
 
