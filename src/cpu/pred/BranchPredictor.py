@@ -1009,7 +1009,7 @@ class TAGEBase_BLK(SimObject):
         [0, 8, 8, 8, 8, 8, 8], "Tag size in TAGE tag tables")
     #log2 table size of base table and tage table
     logTagTableSizes = VectorParam.Int(
-        [18, 11, 11, 11, 11, 11, 11], "Log2 of TAGE table sizes")
+        [11, 11, 11, 11, 11, 11, 11], "Log2 of TAGE table sizes")
     logRatioBiModalHystEntries = Param.Unsigned(2,
         "Log num of prediction entries for a shared hysteresis bit " \
         "for the Bimodal")
