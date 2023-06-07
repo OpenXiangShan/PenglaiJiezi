@@ -366,7 +366,7 @@ stages:
       steps:
         - checkout: self
         - run: |
-            rm -rf /gem5_common_trace/env-scripts; cd /gem5_common_trace; git clone https://git.woa.com/qianlnzhang/env-scripts.git
+            rm -rf /gem5_common_trace/env-scripts; cd /gem5_common_trace; git clone -b zql https://git.woa.com/qianlnzhang/env-scripts.git; 
           name: "git checkout env-scripts"
         - run: |
             python3 ./scripts/test_sc2006_simpoint_report.py --jobs_num 18 --repo_dir /$BK_CI_GIT_REPO_NAME/$BK_CI_GIT_REPO_BRANCH/$BK_CI_GIT_REPO_HEAD_COMMIT_ID/ --action normal
