@@ -22,7 +22,7 @@ if 1:
     S_DIR_COMMON = '/gem5_common_trace'
     S_FILE_TASK_INFO = S_DIR_COMMON + '/task_info_spec06_rv64gcb_o2_20m.txt'
     S_FILE_SCRIPT = S_DIR_COMMON + \
-                    '/env-scripts/perf/tencent_spectest_gem5_new.py'
+                    '/env-scripts/perf/tencent_spectest_gem5_zql.py'
     S_TASK_CPT = './simpoint/spec06_rv64gcb_o2_20m/take_cpt'
     S_TRACE = '/trace_spec06_rv64gcb_o2_20m/'
 else:

@@ -30,13 +30,16 @@ function git_pull_env_scripts()
     rm -rf /gem5_common_trace/env-scripts
     cd /gem5_common_trace
     git clone https://git.woa.com/qianlnzhang/env-scripts.git
+    cd ./env-scripts
+    git checkout zql 
+    cd ../
     
     if [ $? -ne 0 ]; then
         Print_Error "end: GEM5: FAILED, git clone env-scripts failed!!!"
         exit 2
     fi
 
-    cd -
+    cd $GEM5_BASE_DIR
 }
 
 function build_top()
