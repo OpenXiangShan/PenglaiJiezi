@@ -47,31 +47,37 @@ class IntALU(FUDesc):
     opList = [OpDesc(opClass="IntAlu")]
     count = 6
 
+class Branch(FUDesc):
+    opList = [
+        OpDesc(opClass="DirBran"),
+        OpDesc(opClass="IndirBran"),
+    ]
+    count = 2
+
 
 class IntMultDiv(FUDesc):
     opList = [
         OpDesc(opClass="IntMult", opLat=3),
         OpDesc(opClass="IntDiv", opLat=20, pipelined=False),
     ]
-
     count = 2
 
 
 class FP_ALU(FUDesc):
     opList = [
-        OpDesc(opClass="FloatAdd", opLat=2),
-        OpDesc(opClass="FloatCmp", opLat=2),
-        OpDesc(opClass="FloatCvt", opLat=2),
+        OpDesc(opClass="FloatAdd", opLat=3),
+        OpDesc(opClass="FloatMult", opLat=3),
+        OpDesc(opClass="FMAMul", opLat=3),
+        OpDesc(opClass="FMAAcc", opLat=2),
+        OpDesc(opClass="FloatCmp", opLat=3),
+        OpDesc(opClass="FloatCvt", opLat=3),
+        OpDesc(opClass="FloatMisc", opLat=3),
     ]
     count = 4
 
 
 class FP_MultDiv(FUDesc):
     opList = [
-        OpDesc(opClass="FloatMult", opLat=4),
-        OpDesc(opClass="FMAMul", opLat=3),
-        OpDesc(opClass="FMAAcc", opLat=2),
-        OpDesc(opClass="FloatMisc", opLat=3),
         OpDesc(opClass="FloatDiv", opLat=12, pipelined=False),
         OpDesc(opClass="FloatSqrt", opLat=24, pipelined=False),
     ]
@@ -116,13 +122,15 @@ class PredALU(FUDesc):
 
 
 class ReadPort(FUDesc):
-    opList = [OpDesc(opClass="MemRead"), OpDesc(opClass="FloatMemRead")]
-    count = 0
+    opList = [OpDesc(opClass="MemRead", opLat=4),
+              OpDesc(opClass="FloatMemRead", opLat=4)]
+    count = 2
 
 
 class WritePort(FUDesc):
-    opList = [OpDesc(opClass="MemWrite"), OpDesc(opClass="FloatMemWrite")]
-    count = 0
+    opList = [OpDesc(opClass="MemWrite", opLat=3),
+              OpDesc(opClass="FloatMemWrite", opLat=3)]
+    count = 2
 
 
 class RdWrPort(FUDesc):
@@ -132,7 +140,7 @@ class RdWrPort(FUDesc):
         OpDesc(opClass="FloatMemRead"),
         OpDesc(opClass="FloatMemWrite"),
     ]
-    count = 4
+    count = 0
 
 
 class IprPort(FUDesc):
