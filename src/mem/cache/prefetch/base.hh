@@ -114,6 +114,12 @@ class Base : public ClockedObject
         Addr paddress;
         /** Whether this event comes from a cache miss */
         bool cacheMiss;
+        /** pf Target cache ID delta for the prefetcher
+         * if this = 2, current cache's id = 1(l1dcache),
+         * then the target cache id = 3(l3cache),
+         * note that, l1i's id=0, l1d's id=1, l2's id=2, l3's id=3
+        */
+        uint8_t pf_target_id_delta=-1;
         /** Pointer to the associated request data */
         uint8_t *data;
 
@@ -199,6 +205,15 @@ class Base : public ClockedObject
         bool isCacheMiss() const
         {
             return cacheMiss;
+        }
+
+        /**
+         * Check if this event should prefetch to next level
+         * @result true if this event should prefetch to next level
+         */
+        uint8_t getPFTgtIDDelta() const
+        {
+            return pf_target_id_delta;
         }
 
         /**
@@ -298,8 +313,20 @@ class Base : public ClockedObject
     /** Prefetch on hit on prefetched lines */
     const bool prefetchOnPfHit;
 
+    /** Prefetch to target level cache
+     * Which means current cache's prefetcher will not store
+     * the prefetched cacheline into current cache level, but
+     * prefetch to the level of current cache plus
+     * prefetchTargetCacheDelta. i.e.: current cache is L1d(id: 1),
+     * the delta=2, then prefetcher will prefetch to L3(id: 3).
+     * Note that, we use delta but not the absolute value, because
+     * the prefetcher may be work with any cache level
+    */
+    const uint8_t prefetchTargetCacheDelta;
+
     /** Use Virtual Addresses for prefetching */
     const bool useVirtualAddresses;
+
 
     /**
      * Determine if this access should be observed
@@ -386,6 +413,10 @@ class Base : public ClockedObject
     virtual PacketPtr getPacket() = 0;
 
     virtual Tick nextPrefetchReadyTime() const = 0;
+
+    uint8_t getPFTgtDelta() const {
+        return prefetchTargetCacheDelta;
+    }
 
     void
     prefetchUnused()

@@ -69,6 +69,8 @@ class BasePrefetcher(ClockedObject):
 
     # Get the block size from the parent (system)
     block_size = Param.Int(Parent.cache_line_size, "Block size in bytes")
+    prefetch_target_id_delta = Param.Unsigned(0,
+                "prefetch target cache delta")
 
     on_miss = Param.Bool(False, "Only notify prefetcher on misses")
     on_read = Param.Bool(True, "Notify prefetcher on reads")
@@ -264,6 +266,68 @@ class IndirectMemoryPrefetcher(QueuedPrefetcher):
     )
     streaming_distance = Param.Unsigned(
         4, "Number of prefetches to generate when using the stream prefetcher"
+    )
+
+
+class SignaturePathPrefetcherToLowerLevel(QueuedPrefetcher):
+    type = "SignaturePathPrefetcher"
+    cxx_class = "gem5::prefetch::SignaturePath"
+    cxx_header = "mem/cache/prefetch/signature_path.hh"
+
+    signature_shift = Param.UInt8(
+        3, "Number of bits to shift when calculating a new signature"
+    )
+    prefetch_target_id_delta = Param.Unsigned(1,
+                                            "prefetch target cache delta")
+
+    signature_bits = Param.UInt16(12, "Size of the signature, in bits")
+    signature_table_entries = Param.MemorySize(
+        "1024", "Number of entries of the signature table"
+    )
+    signature_table_assoc = Param.Unsigned(
+        2, "Associativity of the signature table"
+    )
+    signature_table_indexing_policy = Param.BaseIndexingPolicy(
+        SetAssociative(
+            entry_size=1,
+            assoc=Parent.signature_table_assoc,
+            size=Parent.signature_table_entries,
+        ),
+        "Indexing policy of the signature table",
+    )
+    signature_table_replacement_policy = Param.BaseReplacementPolicy(
+        LRURP(), "Replacement policy of the signature table"
+    )
+
+    num_counter_bits = Param.UInt8(
+        3, "Number of bits of the saturating counters"
+    )
+    pattern_table_entries = Param.MemorySize(
+        "4096", "Number of entries of the pattern table"
+    )
+    pattern_table_assoc = Param.Unsigned(
+        1, "Associativity of the pattern table"
+    )
+    strides_per_pattern_entry = Param.Unsigned(
+        4, "Number of strides stored in each pattern entry"
+    )
+    pattern_table_indexing_policy = Param.BaseIndexingPolicy(
+        SetAssociative(
+            entry_size=1,
+            assoc=Parent.pattern_table_assoc,
+            size=Parent.pattern_table_entries,
+        ),
+        "Indexing policy of the pattern table",
+    )
+    pattern_table_replacement_policy = Param.BaseReplacementPolicy(
+        LRURP(), "Replacement policy of the pattern table"
+    )
+
+    prefetch_confidence_threshold = Param.Float(
+        0.5, "Minimum confidence to issue prefetches"
+    )
+    lookahead_confidence_threshold = Param.Float(
+        0.75, "Minimum confidence to continue exploring lookahead entries"
     )
 
 

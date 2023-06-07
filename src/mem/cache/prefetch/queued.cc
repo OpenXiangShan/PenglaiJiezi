@@ -147,7 +147,9 @@ Queued::printQueue(const std::list<DeferredPacket> &queue) const
         /* Set paddr to 0 if not yet translated */
         Addr paddr = it->pkt ? it->pkt->getAddr() : 0;
         DPRINTF(HWPrefetchQueue, "%s[%d]: Prefetch Req VA: %#x PA: %#x "
-                "prio: %3d\n", queue_name, pos, vaddr, paddr, it->priority);
+                "prio: %3d, getPFTgtIDDelta:%d\n",
+                queue_name, pos, vaddr, paddr, it->priority,
+                it->pfInfo.getPFTgtIDDelta());
     }
 }
 
@@ -186,6 +188,8 @@ Queued::notify(const PacketPtr &pkt, const PrefetchInfo &pfi)
 {
     Addr blk_addr = blockAddress(pfi.getAddr());
     bool is_secure = pfi.isSecure();
+    DPRINTF(HWPrefetch, "in func:%s, getPFTgtIDDelta:%d\n",
+        __func__, pfi.getPFTgtIDDelta());
 
     // Squash queued prefetches if demand miss to same line
     if (queueSquash) {
@@ -411,6 +415,8 @@ Queued::insert(const PacketPtr &pkt, PrefetchInfo &new_pfi,
             return;
         }
     }
+    DPRINTF(HWPrefetch, "in func:%s, getPFTgtIDDelta=%d\n",
+        __func__, new_pfi.getPFTgtIDDelta());
 
     /*
      * Physical address computation
@@ -505,6 +511,8 @@ void
 Queued::addToQueue(std::list<DeferredPacket> &queue,
                              DeferredPacket &dpp)
 {
+    DPRINTF(HWPrefetch, "in func:%s,getPFTgtIDDelta:%d\n",
+                __func__, dpp.pfInfo.getPFTgtIDDelta());
     /* Verify prefetch buffer space for request */
     unsigned queue_size;
     if (&queue == &pfq) {

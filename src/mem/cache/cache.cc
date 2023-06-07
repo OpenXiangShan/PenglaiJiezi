@@ -485,6 +485,14 @@ Cache::createMissPacket(PacketPtr cpu_pkt, CacheBlk *blk,
     assert(!cpu_pkt->isEviction());
 
     bool blkValid = blk && blk->isValid();
+    if (cpu_pkt->req->pfTgtIDDiffWithCacheOrgID()){
+        DPRINTF(Cache, "%s:  %s pfTgtIDDiffWithCacheOrgID\n",
+                __func__, cpu_pkt->print());
+    }
+    else {
+        DPRINTF(Cache, "%s:  %s Not pfTgtIDDiffWithCacheOrgID\n",
+                __func__, cpu_pkt->print());
+    }
 
     if (cpu_pkt->req->isUncacheable() ||
         (!blkValid && cpu_pkt->isUpgrade()) ||
