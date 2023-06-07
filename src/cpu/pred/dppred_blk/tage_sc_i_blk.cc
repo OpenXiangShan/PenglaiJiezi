@@ -201,6 +201,9 @@ TAGE_SC_I_BLK::tick_s2(SquashInfo squash_info, UpdateInfo update_info,
                             update_info.update_btb,
                             update_info.false_hit,
                             update_info.slot0_false_empty);
+        ras_blk->commit(update_info.new_btb_entry.fallThruAddr,
+                        update_info.isCall,
+                        update_info.isRet);
     }
 
     /*free mem*/

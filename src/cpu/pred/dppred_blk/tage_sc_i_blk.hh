@@ -122,6 +122,8 @@ class TAGE_SC_I_BLK: public SimObject
       bool isCond[MaxNumBr];
       bool isAlwaysTaken[MaxNumBr];
       bool isIndir; //first taken branch is indir
+      bool isCall;
+      bool isRet;
       Addr indir_target;
       TageSCIBranchInfo tage_sc_i_bInfo;
       BTBEntry new_btb_entry;

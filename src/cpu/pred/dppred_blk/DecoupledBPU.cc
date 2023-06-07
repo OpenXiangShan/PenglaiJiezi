@@ -1113,6 +1113,18 @@ DecoupledBPU::tick(){
                                   !new_btb_entry.slot[1].sharing &&
                                   new_btb_entry.isJalr &&
                                   !new_btb_entry.isRet;
+            update_info.isCall = new_btb_entry.slot[1].valid &&
+                                  ftq_entry.cfiIndex.valid &&
+                                  (new_btb_entry.slot[1].offset ==
+                                  ftq_entry.cfiIndex.cfiIndex) &&
+                                  !new_btb_entry.slot[1].sharing &&
+                                  new_btb_entry.isCall;
+            update_info.isRet = new_btb_entry.slot[1].valid &&
+                                  ftq_entry.cfiIndex.valid &&
+                                  (new_btb_entry.slot[1].offset ==
+                                  ftq_entry.cfiIndex.cfiIndex) &&
+                                  !new_btb_entry.slot[1].sharing &&
+                                  new_btb_entry.isRet;
             update_info.indir_target = new_btb_entry.slot[1].target;
         }else{
             for (unsigned i = 0; i <= MaxNumBr-1; ++i){
@@ -1156,6 +1168,32 @@ DecoupledBPU::tick(){
                                   tagebtbBranchInfo->
                                   btbBranchInfo->hitBtbEntry.isJalr &&
                                   !ftq_entry.tage_sc_i_bInfo.
+                                  tagebtbBranchInfo->
+                                  btbBranchInfo->hitBtbEntry.isRet;
+            update_info.isCall = ftq_entry.tage_sc_i_bInfo.tagebtbBranchInfo->
+                                  btbBranchInfo->hitBtbEntry.slot[1].valid &&
+                                  ftq_entry.cfiIndex.valid &&
+                                  (ftq_entry.tage_sc_i_bInfo.
+                                   tagebtbBranchInfo->
+                                   btbBranchInfo->hitBtbEntry.slot[1].offset ==
+                                  ftq_entry.cfiIndex.cfiIndex) &&
+                                  !ftq_entry.tage_sc_i_bInfo.
+                                  tagebtbBranchInfo->
+                                  btbBranchInfo->hitBtbEntry.slot[1].sharing &&
+                                  ftq_entry.tage_sc_i_bInfo.
+                                  tagebtbBranchInfo->
+                                  btbBranchInfo->hitBtbEntry.isCall;
+            update_info.isRet = ftq_entry.tage_sc_i_bInfo.tagebtbBranchInfo->
+                                  btbBranchInfo->hitBtbEntry.slot[1].valid &&
+                                  ftq_entry.cfiIndex.valid &&
+                                  (ftq_entry.tage_sc_i_bInfo.
+                                   tagebtbBranchInfo->
+                                   btbBranchInfo->hitBtbEntry.slot[1].offset ==
+                                  ftq_entry.cfiIndex.cfiIndex) &&
+                                  !ftq_entry.tage_sc_i_bInfo.
+                                  tagebtbBranchInfo->
+                                  btbBranchInfo->hitBtbEntry.slot[1].sharing &&
+                                  ftq_entry.tage_sc_i_bInfo.
                                   tagebtbBranchInfo->
                                   btbBranchInfo->hitBtbEntry.isRet;
             update_info.indir_target = ftq_entry.tage_sc_i_bInfo.
@@ -1320,8 +1358,8 @@ DecoupledBPU::tick(){
                     slot1_is_ret_s3=%d\n",
                     pred_isCond_s3[1], slot1_is_indir_s3,
                     slot1_is_ret_s3);
-                assert(!pred_isCond_s3[1] && slot1_is_indir_s3 &&
-                        !slot1_is_ret_s3);
+                // assert(!pred_isCond_s3[1] && slot1_is_indir_s3 &&
+                //         !slot1_is_ret_s3);
                 squash_info.is_squash = false;
                 squash_info.isCond = false;
                 squash_info.isCall = slot1_is_call_s3;
