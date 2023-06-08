@@ -17,8 +17,8 @@ stages:
         4320
       steps:
         - checkout: self
-        with:
-          enableVirtualMergeBranch: false
+          with:
+            enableVirtualMergeBranch: false
 
         - run: |
             bash ./scripts/build.sh
@@ -39,8 +39,8 @@ stages:
         4320
       steps:
         - checkout: self
-        with:
-          enableVirtualMergeBranch: false
+          with:
+            enableVirtualMergeBranch: false
 
         - run: |
             bash ./scripts/build.sh
@@ -60,8 +60,8 @@ stages:
         4320
       steps:
         - checkout: self
-        with:
-          enableVirtualMergeBranch: false
+          with:
+            enableVirtualMergeBranch: false
 
         - run: |
             bash ./scripts/build.sh
@@ -82,8 +82,8 @@ stages:
         4320
       steps:
         - checkout: self
-        with:
-          enableVirtualMergeBranch: false
+          with:
+            enableVirtualMergeBranch: false
 
         - run: |
             bash ./scripts/build.sh
@@ -103,8 +103,8 @@ stages:
         4320
       steps:
         - checkout: self
-        with:
-          enableVirtualMergeBranch: false
+          with:
+            enableVirtualMergeBranch: false
 
         - run: |
             bash ./scripts/build.sh
@@ -124,8 +124,8 @@ stages:
         4320
       steps:
         - checkout: self
-        with:
-          enableVirtualMergeBranch: false
+          with:
+            enableVirtualMergeBranch: false
 
         - run: |
             bash ./scripts/build.sh
@@ -145,8 +145,8 @@ stages:
         4320
       steps:
         - checkout: self
-        with:
-          enableVirtualMergeBranch: false
+          with:
+            enableVirtualMergeBranch: false
 
         - run: |
             bash ./scripts/build.sh
@@ -167,8 +167,8 @@ stages:
         4320
       steps:
         - checkout: self
-        with:
-          enableVirtualMergeBranch: false
+          with:
+            enableVirtualMergeBranch: false
 
         - run: |
             bash ./scripts/build.sh
@@ -188,8 +188,8 @@ stages:
         4320
       steps:
         - checkout: self
-        with:
-          enableVirtualMergeBranch: false
+          with:
+            enableVirtualMergeBranch: false
 
         - run: |
             bash ./scripts/build.sh
@@ -209,8 +209,8 @@ stages:
         4320
       steps:
         - checkout: self
-        with:
-          enableVirtualMergeBranch: false
+          with:
+            enableVirtualMergeBranch: false
 
         - run: |
             bash ./scripts/build.sh
@@ -230,8 +230,8 @@ stages:
         4320
       steps:
         - checkout: self
-        with:
-          enableVirtualMergeBranch: false
+          with:
+            enableVirtualMergeBranch: false
 
         - run: |
             bash ./scripts/build.sh
@@ -251,8 +251,8 @@ stages:
         4320
       steps:
         - checkout: self
-        with:
-          enableVirtualMergeBranch: false
+          with:
+            enableVirtualMergeBranch: false
 
         - run: |
             bash ./scripts/build.sh
@@ -272,8 +272,8 @@ stages:
         4320
       steps:
         - checkout: self
-        with:
-          enableVirtualMergeBranch: false
+          with:
+            enableVirtualMergeBranch: false
 
         - run: |
             bash ./scripts/build.sh
@@ -293,8 +293,8 @@ stages:
         4320
       steps:
         - checkout: self
-        with:
-          enableVirtualMergeBranch: false
+          with:
+            enableVirtualMergeBranch: false
 
         - run: |
             bash ./scripts/build.sh
@@ -314,8 +314,8 @@ stages:
         4320
       steps:
         - checkout: self
-        with:
-          enableVirtualMergeBranch: false
+          with:
+            enableVirtualMergeBranch: false
 
         - run: |
             bash ./scripts/build.sh
@@ -335,8 +335,8 @@ stages:
         4320
       steps:
         - checkout: self
-        with:
-          enableVirtualMergeBranch: false
+          with:
+            enableVirtualMergeBranch: false
 
         - run: |
             bash ./scripts/build.sh
@@ -356,8 +356,8 @@ stages:
         4320
       steps:
         - checkout: self
-        with:
-          enableVirtualMergeBranch: false
+          with:
+            enableVirtualMergeBranch: false
 
         - run: |
             bash ./scripts/build.sh
@@ -377,8 +377,8 @@ stages:
         4320
       steps:
         - checkout: self
-        with:
-          enableVirtualMergeBranch: false
+          with:
+            enableVirtualMergeBranch: false
 
         - run: |
             bash ./scripts/build.sh
@@ -401,8 +401,8 @@ stages:
         4320
       steps:
         - checkout: self
-        with:
-          enableVirtualMergeBranch: false
+          with:
+            enableVirtualMergeBranch: false
 
         - run: |
             rm -rf /gem5_common_trace/env-scripts; cd /gem5_common_trace; git clone https://git.woa.com/qianlnzhang/env-scripts.git
