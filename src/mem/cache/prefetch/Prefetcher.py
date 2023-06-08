@@ -484,6 +484,58 @@ class AMPMPrefetcher(QueuedPrefetcher):
     ampm = Param.AccessMapPatternMatching(
         AccessMapPatternMatching(), "Access Map Pattern Matching object"
     )
+class BingoPrefetcher(QueuedPrefetcher):
+    type = 'BingoPrefetcher'
+    cxx_class = 'gem5::prefetch::Bingo'
+    cxx_header = "mem/cache/prefetch/bingo.hh"
+
+    #block_size = Param.Unsigned(Parent.block_size,
+    #        "Block size in bytes")
+
+    pc_width = Param.Unsigned(16,
+        "PC width used to index the PHT")
+    max_addr_width = Param.Unsigned(16,
+        "Max addr width used to index the PHT")
+    min_addr_width = Param.Unsigned(5,
+        "Min addr width used to index the PHT")
+    region_size = Param.Unsigned(2048,
+        "region size")
+    pht_vote_threshold = Param.Float(0.20,
+        "threshold for PHT index vote")
+    at_entry_count = Param.MemorySize("128",
+        "Number of entries in accumulation table")
+    at_assoc = Param.Unsigned(16,
+        "Associativity of the accumulation table")
+    at_indexing_policy = Param.BaseIndexingPolicy(
+        SetAssociative(entry_size = 1, assoc = Parent.at_assoc,
+        size = Parent.at_entry_count),
+        "Indexing policy of the accumulation table")
+    at_replacement_policy = Param.BaseReplacementPolicy(LRURP(),
+            "Replacement policy of the accumulation table")
+    filter_table_entry_count = Param.MemorySize("64",
+        "Number of entries in filter table")
+    filter_table_assoc = Param.Unsigned(16,
+        "Associativity of the filter table table")
+    filter_table_indexing_policy = Param.BaseIndexingPolicy(
+        SetAssociative(entry_size = 1, assoc = Parent.filter_table_assoc,
+        size = Parent.filter_table_entry_count),
+        "Indexing policy of the filter table")
+    filter_table_replacement_policy = Param.BaseReplacementPolicy(LRURP(),
+        "Replacement policy of the filter table")
+    pht_entry_count = Param.MemorySize("16384",
+        "Number of entries in pattern history table")
+    pht_assoc = Param.Unsigned(16,
+        "Associativity of the pattern history table")
+    pht_indexing_policy = Param.BaseIndexingPolicy(
+        SetAssociative(entry_size = 1,
+            assoc = Parent.pht_assoc,
+            size = Parent.pht_entry_count),
+        "Indexing policy of the pattern history table")
+    pht_replacement_policy = Param.BaseReplacementPolicy(LRURP(),
+            "Replacement policy of the pattern history table")
+    epoch_cycles = Param.Cycles(256000, "Cycles in an epoch period")
+
+
 
 
 class DeltaCorrelatingPredictionTables(SimObject):
