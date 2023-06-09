@@ -326,7 +326,8 @@ ROB::doSquash(ThreadID tid)
 
     bool robTailUpdate = false;
 
-    unsigned int numInstsToSquash = squashWidth;
+    assert(dynSquashWidth);
+    unsigned int numInstsToSquash = dynSquashWidth;
 
     // If the CPU is exiting, squash all of the instructions
     // it is told to, even if that exceeds the squashWidth.
@@ -487,6 +488,27 @@ ROB::squash(InstSeqNum squash_num, ThreadID tid)
     doneSquashing[tid] = false;
 
     squashedSeqNum[tid] = squash_num;
+
+
+
+    unsigned total_inst_to_squash = 0;
+    for (auto it = instList[tid].begin(); it != instList[tid].end(); ++it) {
+        if ((*it)->seqNum > squash_num) {
+            total_inst_to_squash++;
+        }
+    }
+    unsigned num_uncommited_inst = instList[tid].size() - total_inst_to_squash;
+
+    unsigned squash_cycle = std::min(
+                               ceil((double)num_uncommited_inst/squashWidth),
+                               ceil((double)total_inst_to_squash/squashWidth));
+
+    unsigned dynSquashWidth_tmp = ceil(
+                                      (double)total_inst_to_squash/squash_cycle
+                                  );
+    dynSquashWidth = std::max(dynSquashWidth_tmp,1u);
+
+
 
     if (!instList[tid].empty()) {
         InstIt tail_thread = instList[tid].end();
