@@ -294,6 +294,7 @@ class ROB
 
     /** Number of instructions that can be squashed in a single cycle. */
     unsigned squashWidth;
+    unsigned dynSquashWidth;
 
   public:
     std::list<DynInstPtr>* getInstList(ThreadID tid){

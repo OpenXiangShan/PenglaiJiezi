@@ -218,7 +218,10 @@ def addNoISAOptions(parser):
                         default=True,
                         help="start arch database from "
                         "the beginning of the simulation")
-
+    # decoupledFrontend option
+    parser.add_argument("--disable-decoupledFrontend",
+                        action="store_true",
+                        help="unuse decoupled frontend")
 
 # Add common options that assume a non-NULL ISA.
 

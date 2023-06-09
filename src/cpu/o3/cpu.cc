@@ -84,6 +84,7 @@ CPU::CPU(const BaseO3CPUParams &params)
       instcount(0),
 #endif
       removeInstsThisCycle(false),
+      enDecoupleFrontend(params.enable_decoupledFrontend),
       fetch(this, params),
       decode(this, params),
       rename(this, params),
@@ -158,6 +159,7 @@ CPU::CPU(const BaseO3CPUParams &params)
     commit.setActiveThreads(&activeThreads);
 
     // Give each of the stages the time buffer they will use.
+    setTimeBuffer(&timeBuffer);
     fetch.setTimeBuffer(&timeBuffer);
     decode.setTimeBuffer(&timeBuffer);
     rename.setTimeBuffer(&timeBuffer);
@@ -462,6 +464,13 @@ CPU::tick()
     updateCycleCounters(BaseCPU::CPU_STATE_ON);
 
 //    activity = false;
+
+    // check and squash
+    if (enDecoupleFrontend) {
+        for (ThreadID tid = 0; tid < numThreads; ++tid) {
+            checkSignalsAndUpdate(tid);
+        }
+    }
 
     //Tick each of the stages
     fetch.tick();
@@ -1271,6 +1280,20 @@ CPU::instDone(ThreadID tid, const DynInstPtr &inst)
 }
 
 void
+CPU::squashAndremoveInst(const DynInstPtr &inst)
+{
+    DPRINTF(O3CPU, "Seting squashed and removing instruction "
+            "[tid:%i] PC %s [sn:%lli]\n",
+            inst->threadNumber, inst->pcState(), inst->seqNum);
+
+    removeInstsThisCycle = true;
+    // Mark it as squashed.
+    inst->setSquashed();
+
+    // Remove the front instruction.
+    removeList.push(inst->getInstListIt());
+}
+void
 CPU::removeFrontInst(const DynInstPtr &inst)
 {
     DPRINTF(O3CPU, "Removing committed instruction [tid:%i] PC %s "
@@ -1625,6 +1648,26 @@ CPU::readArchFloatReg(int reg_idx, ThreadID tid)
     PhysRegIdPtr phys_reg =
         commitRenameMap[tid].lookup(RegId(FloatRegClass, reg_idx));
     return regFile.getReg(phys_reg);
+}
+
+void
+CPU::setTimeBuffer(TimeBuffer<TimeStruct> *time_buffer)
+{
+    fromDecode = time_buffer->getWire(-squashSingleDelay);
+    fromCommit = time_buffer->getWire(-squashSingleDelay);
+}
+void
+CPU::checkSignalsAndUpdate(ThreadID tid)
+{
+    // Tell the CPU to remove any instructions that are not in the ROB.
+    if (fromCommit->commitInfo[tid].squash) {
+        removeInstsNotInROB(tid);
+    }
+    // Tell the CPU to remove any instructions that are in flight between
+    // fetch and decode.
+    if (fromDecode->decodeInfo[tid].squash) {
+        removeInstsUntil(fromDecode->decodeInfo[tid].doneSeqNum, tid);
+    }
 }
 
 } // namespace o3

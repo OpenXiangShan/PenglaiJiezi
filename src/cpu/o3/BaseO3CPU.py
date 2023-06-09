@@ -111,8 +111,8 @@ class BaseO3CPU(BaseCPU):
     issueToExecuteDelay = Param.Cycles(1, "Issue to execute delay (internal "
               "to the IEW stage)")
     dispatchWidth = Param.Unsigned(6, "Dispatch width")
-    issueWidth = Param.Unsigned(8, "Issue width")
-    wbWidth = Param.Unsigned(8, "Writeback width")
+    issueWidth = Param.Unsigned(16, "Issue width")
+    wbWidth = Param.Unsigned(16, "Writeback width")
     fuPool = Param.FUPool(DefaultFUPool(), "Functional Unit pool")
 
     iewToCommitDelay = Param.Cycles(1, "Issue/Execute/Writeback to commit "
@@ -128,7 +128,7 @@ class BaseO3CPU(BaseCPU):
     forwardComSize = Param.Unsigned(10,
             "Time buffer size for forward communication")
 
-    LQEntries = Param.Unsigned(80, "Number of load queue entries")
+    LQEntries = Param.Unsigned(128, "Number of load queue entries")
     SQEntries = Param.Unsigned(192, "Number of store queue entries,"
                                "store queue size 64 + "
                                "store buffer 16*8 ")
@@ -150,9 +150,9 @@ class BaseO3CPU(BaseCPU):
 
     numRobs = Param.Unsigned(1, "Number of Reorder Buffers");
 
-    numPhysIntRegs = Param.Unsigned(192,
+    numPhysIntRegs = Param.Unsigned(256,
             "Number of physical integer registers")
-    numPhysFloatRegs = Param.Unsigned(192, "Number of physical floating point "
+    numPhysFloatRegs = Param.Unsigned(256, "Number of physical floating point "
                                       "registers")
     numPhysVecRegs = Param.Unsigned(192, "Number of physical vector "
                                       "registers")
@@ -160,8 +160,8 @@ class BaseO3CPU(BaseCPU):
                                       "registers")
     # most ISAs don't use condition-code regs, so default is 0
     numPhysCCRegs = Param.Unsigned(0, "Number of physical cc registers")
-    numIQEntries = Param.Unsigned(192, "Number of instruction queue entries")
-    numROBEntries = Param.Unsigned(256, "Number of reorder buffer entries")
+    numIQEntries = Param.Unsigned(256, "Number of instruction queue entries")
+    numROBEntries = Param.Unsigned(320, "Number of reorder buffer entries")
 
     smtNumFetchingThreads = Param.Unsigned(1, "SMT Number of Fetching Threads")
     smtFetchPolicy = Param.SMTFetchPolicy('RoundRobin', "SMT Fetch policy")
@@ -179,4 +179,6 @@ class BaseO3CPU(BaseCPU):
     branchPred = Param.BranchPredictor(
         TournamentBP(numThreads=Parent.numThreads), "Branch Predictor"
     )
+    decoupledBPU = Param.DecoupledBPU(DecoupledBPU(), "DecoupledBPU object")
     needsTSO = Param.Bool(False, "Enable TSO Memory model")
+    instPrefetch = Param.Bool(False, "Enable inst prefetch")

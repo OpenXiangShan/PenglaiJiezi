@@ -142,6 +142,8 @@ class DynInst : public ExecContext, public RefCounted
     /** InstRecord that tracks this instructions. */
     Trace::InstRecord *traceData = nullptr;
 
+    bool isEmptyMove{};
+
   protected:
     enum Status
     {
@@ -239,6 +241,8 @@ class DynInst : public ExecContext, public RefCounted
     // Whether or not the source register is ready, one bit per register.
     uint8_t *_readySrcIdx;
 
+    // compressed inst or not
+    bool _compressed = false;
   public:
     size_t numSrcs() const { return _numSrcs; }
     size_t numDests() const { return _numDests; }
@@ -326,7 +330,7 @@ class DynInst : public ExecContext, public RefCounted
     /** Predicted PC state after this instruction. */
     std::unique_ptr<PCStateBase> predPC;
 
-    Addr fallThruPC;
+    Addr fallThruPC = 0xdeadbeaf;
 
     /** fsqId and ftqId are used for squashing and committing */
     /** The fetch stream queue ID of the instruction. */
@@ -376,6 +380,8 @@ class DynInst : public ExecContext, public RefCounted
     /////////////////////// Checker //////////////////////
     // Need a copy of main request pointer to verify on writes.
     RequestPtr reqToVerify;
+
+    unsigned ftqIdx;
 
   public:
     /** Records changes to result? */
@@ -543,15 +549,21 @@ class DynInst : public ExecContext, public RefCounted
     bool
     mispredicted()
     {
+        bool dir_mispred = (!readPredTaken() && isUncondCtrl());
         std::unique_ptr<PCStateBase> next_pc(pc->clone());
         staticInst->advancePC(*next_pc);
-        return *next_pc != *predPC;
+        return (*next_pc != *predPC) || dir_mispred;
     }
+
+    // compressed inst flag set and read
+    void compressed(bool c) { _compressed = c; }
+    bool compressed() const { return _compressed; }
 
     //
     //  Instruction types.  Forward checks to StaticInst object.
     //
-    bool isNop()          const { return staticInst->isNop(); }
+    void setEmptyMove(bool f) { isEmptyMove = f; }
+    bool isNop()          const { return staticInst->isNop() || isEmptyMove; }
     bool isMemRef()       const { return staticInst->isMemRef(); }
     bool isLoad()         const { return staticInst->isLoad(); }
     bool isStore()        const { return staticInst->isStore(); }
@@ -1208,10 +1220,10 @@ class DynInst : public ExecContext, public RefCounted
     void printDisassembly() const
     {
         DPRINTF(CommitTrace,
-                "[sn:%lu] pc:%#lx %s, complete at %lu, addr: %#lx\n", seqNum,
-                pcState().instAddr(),
+                "[sn:%lu] pc:%#lx %s, rdy: %lu, comp: %lu, addr: %#lx\n",
+                seqNum, pcState().instAddr(),
                 staticInst->disassemble(pcState().instAddr()).c_str(),
-                completionTick, physEffAddr);
+                readyTick, completionTick, physEffAddr);
     }
     void
     setFsqId(unsigned id)

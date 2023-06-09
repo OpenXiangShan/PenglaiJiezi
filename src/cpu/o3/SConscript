@@ -41,6 +41,8 @@ if env['CONF']['TARGET_ISA'] != 'null':
     Source('decode.cc')
     Source('dyn_inst.cc')
     Source('fetch.cc')
+    Source('fetch_stage.cc')
+    Source('fetch_top.cc')
     Source('free_list.cc')
     Source('fu_pool.cc')
     Source('iew.cc')
@@ -73,6 +75,7 @@ if env['CONF']['TARGET_ISA'] != 'null':
     DebugFlag('InstCommited')
     DebugFlag('FetchFault')
     DebugFlag('Counters')
+    DebugFlag('DecoupledBPU')
 
     CompoundFlag('O3CPUAll', [ 'Fetch', 'Decode', 'Rename', 'IEW', 'Commit',
         'IQ', 'ROB', 'FreeList', 'LSQ', 'LSQUnit', 'StoreSet', 'MemDepUnit',

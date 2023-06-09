@@ -52,6 +52,7 @@ class FUPool(SimObject):
 class DefaultFUPool(FUPool):
     FUList = [
         IntALU(),
+        Branch(),
         IntMultDiv(),
         FP_ALU(),
         FP_MultDiv(),

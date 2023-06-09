@@ -223,6 +223,7 @@ struct TimeStruct
         /// instruction for a branch mispredict, but the same instruction for
         /// order violation and the like
         std::unique_ptr<PCStateBase> pc; // *F
+        Addr committedPC; // *F for trap squash
 
         /// Provide fetch the instruction that mispredicted, if this
         /// pointer is not-null a misprediction occured
@@ -244,11 +245,20 @@ struct TimeStruct
         /// retired or squashed sequence number.
         InstSeqNum doneSeqNum; // *F, I
 
+        ///commit info, including all the committed instrs in commit block
+        std::vector<DynInstPtr> cmtInfo;
+
+        uint64_t doneFsqId = 0xdeadbeaf; // F
+
         /// Tell Rename how many free entries it has in the ROB
         unsigned freeROBEntries; // *R
 
         bool squash; // *F, D, R, I
         bool robSquashing; // *F, D, R, I
+        /// tell BPU, wether the inst invoke squash
+        /// should be committed, when squashItSelf is true
+        /// the inst invoke squash will not commit
+        bool squashItSelf;
 
         /// Rename should re-read number of free rob entries
         bool usedROB; // *R

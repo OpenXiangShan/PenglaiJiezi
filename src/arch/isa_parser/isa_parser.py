@@ -433,6 +433,10 @@ class InstObjParams(object):
                 self.op_class = 'FloatAddOp'
             elif 'IsVector' in self.flags:
                 self.op_class = 'SimdAddOp'
+            elif 'IsDirectControl' in self.flags:
+                self.op_class = 'DirBranOp'
+            elif 'IsIndirectControl' in self.flags:
+                self.op_class = 'IndirBranOp'
             else:
                 self.op_class = 'IntAluOp'
 

@@ -794,7 +794,13 @@ Decode::decodeInsts(ThreadID tid)
                 break;
             }
         }
-
+        if (inst->isNonSpeculative() && inst->readPredTaken()) {
+            // TODO: redirect to fall thru
+            std::unique_ptr<PCStateBase> npc(inst->pcState().clone());
+            npc->as<RiscvISA::PCState>().set(inst->pcState().getFallThruPC());
+            inst->setPredTaken(false);
+            inst->setPredTarg(*npc);
+        }
     }
 
     for (int i = 0;i < decodeWidth;i++) {

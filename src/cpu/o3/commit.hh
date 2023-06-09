@@ -376,6 +376,24 @@ class Commit
      * stage once squashing starts.
      */
     DynInstPtr squashAfterInst[MaxThreads];
+    /**
+     * Instruction passed to squashFromTrap().
+     *
+     */
+    DynInstPtr squashInterruptInst[MaxThreads];
+
+
+    /**
+     * Instruction caused squash.
+     *
+     * The implementation needs to buffer all the instruction
+     * that caused a squash since this needs to be passed to the
+     * fetch stage to implement decoupled-BPU once squashing starts.
+     * squashAfterInst is included in this inst, only use this is ok;
+     */
+    DynInstPtr squashInst[MaxThreads];
+    /** Records wether or not a inst squash itsel*/
+    bool squashItSelf[MaxThreads];
 
     /** Priority List used for Commit Policy */
     std::list<ThreadID> priority_list;

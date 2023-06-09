@@ -960,3 +960,276 @@ class MultiperspectivePerceptronTAGE8KB(MultiperspectivePerceptronTAGE):
     tage = MPP_TAGE_8KB()
     loop_predictor = MPP_LoopPredictor_8KB()
     statistical_corrector = MPP_StatisticalCorrector_8KB()
+
+ #decoupled block-based predictor
+class UBTB_BLK(SimObject):
+    type = 'UBTB_BLK'
+    cxx_class = 'gem5::branch_prediction::UBTB_BLK'
+    cxx_header = "cpu/pred/dppred_blk/ubtb_blk.hh"
+
+    numEntries = Param.Unsigned(32, "Number of ras stack entrys")
+    ways = Param.Unsigned(32, "Number of BTB ways")
+    tagBits = Param.Unsigned(16, "Size of the uBTB tags, in bits")
+    instShiftAmt = Param.Unsigned(1, "Number of bits to shift instructions by")
+    num_threads = Param.Unsigned(Parent.numThreads, "Number of threads")
+    ctrWidth = Param.Unsigned(2, "Width of ras entry ctr")
+    predBlkSize = Param.Unsigned(32, "prediction block size")
+
+class BTB_DIR(SimObject):
+    type = 'BTB_DIR'
+    cxx_class = 'gem5::branch_prediction::BTB_DIR'
+    cxx_header = "cpu/pred/dppred_blk/btb_dir.hh"
+    abstract = True
+
+    numThreads = Param.Unsigned(Parent.numThreads, "Number of threads")
+    numBr = Param.Unsigned(2, "Number of Br slots")
+    BTBEntries = Param.Unsigned(2048, "Number of BTB entries")
+    BTBways = Param.Unsigned(4, "Number of BTB ways")
+    BTBTagSize = Param.Unsigned(20, "Size of the BTB tags, in bits")
+    instShiftAmt = Param.Unsigned(1, "Number of bits to shift instructions by")
+    predBlkSize = Param.Unsigned(32, "prediction block size")
+    numBr = Param.Unsigned(2, "Br number")
+
+class TAGEBase_BLK(SimObject):
+    type = 'TAGEBase_BLK'
+    cxx_class = 'gem5::branch_prediction::TAGEBase_BLK'
+    cxx_header = "cpu/pred/dppred_blk/tage_base_blk.hh"
+
+    numThreads = Param.Unsigned(Parent.numThreads, "Number of threads")
+    instShiftAmt = Param.Unsigned(Parent.instShiftAmt,
+        "Number of bits to shift instructions by")
+
+    nHistoryTables = Param.Unsigned(6, "Number of history tables") #4
+
+    histLengths = VectorParam.Unsigned(
+        [0, 8, 13, 32, 64, 128, 256], "global history length")
+
+    #history length of base table and tage table
+    tagTableTagWidths = VectorParam.Unsigned(
+        [0, 8, 8, 8, 8, 8, 8], "Tag size in TAGE tag tables")
+    #log2 table size of base table and tage table
+    logTagTableSizes = VectorParam.Int(
+        [13, 11, 11, 11, 11, 11, 11], "Log2 of TAGE table sizes")
+    logRatioBiModalHystEntries = Param.Unsigned(2,
+        "Log num of prediction entries for a shared hysteresis bit " \
+        "for the Bimodal")
+
+    tagTableCounterBits = Param.Unsigned(3, "Number of tag table counter bits")
+    baseTableCounterBits = Param.Unsigned(3, "base table ctr bits")
+    tagTableUBits = Param.Unsigned(2, "Number of tag table u bits")
+
+    histBufferSize = Param.Unsigned(2097152,
+            "A large number to track all branch histories(2MEntries default)")
+
+    pathHistBits = Param.Unsigned(16, "Path history size")
+    numBr = Param.Unsigned(2, "Br number")
+
+    logUResetPeriod = Param.Unsigned(7,
+        "Log period in number of branches to reset TAGE useful counters")
+    numUseAltOnNa = Param.Unsigned(128, "Number of USE_ALT_ON_NA counters")
+    initialTCounterValue = Param.Int(0, "Initial value of tCounter")
+    useAltOnNaBits = Param.Unsigned(4, "Size of the USE_ALT_ON_NA counter(s)")
+
+    maxNumAlloc = Param.Unsigned(1,
+        "Max number of TAGE entries allocted on mispredict") #1
+
+    # List of enabled TAGE tables. If empty, all are enabled
+    noSkip = VectorParam.Bool([], "Vector of enabled TAGE tables")
+
+    speculativeHistUpdate = Param.Bool(True,
+        "Use speculative update for histories")
+
+class BTB_TAGE(BTB_DIR):
+    type = 'BTB_TAGE'
+    cxx_class = 'gem5::branch_prediction::BTB_TAGE'
+    cxx_header = "cpu/pred/dppred_blk/btb_tage.hh"
+
+    tage = Param.TAGEBase_BLK(TAGEBase_BLK(), "Tage object")
+
+class RAS_BLK(SimObject):
+    type = 'RAS_BLK'
+    cxx_class = 'gem5::branch_prediction::RAS_BLK'
+    cxx_header = "cpu/pred/dppred_blk/ras_lk_blk.hh"
+
+    numSpecEntries = Param.Unsigned(64, "Number of ras spec stack entrys")
+    numCmtEntries = Param.Unsigned(32, "Number of ras commit stack entrys")
+
+class New_SC_BLK(SimObject):
+    type = 'New_SC_BLK'
+    cxx_class = 'gem5::branch_prediction::New_SC_BLK'
+    cxx_header = "cpu/pred/dppred_blk/new_sc_blk.hh"
+
+    bwnb = Param.Unsigned(2, "Num global backward branch GEHL lengths")
+    bwm = VectorParam.Int([8, 4], "Global backward branch GEHL lengths")
+    logBwnb = Param.Unsigned(10,
+            "Log num of global backward branch GEHL entries")
+    bwWeightInitValue = Param.Int(7,
+     "Initial value of the weights of the global backward branch GEHL entries")
+
+    numEntriesFirstLocalHistories = Param.Unsigned(64,
+        "Number of entries for first local histories")
+    lnb = Param.Unsigned(2, "Num first local history GEHL lenghts")
+    lm = VectorParam.Int([6, 3], "First local history GEHL lengths")
+    logLnb = Param.Unsigned(10,
+            "Log number of first local history GEHL entries")
+    lWeightInitValue = Param.Int(7,
+        "Initial value of the weights of the first local history GEHL entries")
+
+    numEntriesSecondLocalHistories = Param.Unsigned(32,
+        "Number of entries for second local histories")
+    snb = Param.Unsigned(2, "Num second local history GEHL lenghts")
+    sm = VectorParam.Int([16, 8], "Second local history GEHL lengths")
+    logSnb = Param.Unsigned(10,
+        "Log number of second local history GEHL entries")
+
+    numEntriesThirdLocalHistories = Param.Unsigned(16,
+        "Number of entries for third local histories")
+    tnb = Param.Unsigned(0, "Num third local history GEHL lenghts")
+    tm = VectorParam.Int([], "Third local history GEHL lengths")
+    logTnb = Param.Unsigned(10,
+        "Log number of third local history GEHL entries")
+
+    #imnb = Param.Unsigned(2, "Num second IMLI GEHL lenghts")
+    #imm = VectorParam.Int([10, 4], "Second IMLI history GEHL lengths")
+    #logImnb = Param.Unsigned(9, "Log number of second IMLI GEHL entries")
+
+    inb = Param.Unsigned(1, "Num IMLI GEHL lenghts")
+    im = VectorParam.Int([8], "IMLI history GEHL lengths")
+    logInb = Param.Unsigned(10, "Log number of IMLI GEHL entries")
+    iWeightInitValue = Param.Int(7,
+        "Initial value of the weights of the IMLI history GEHL entries")
+
+    logBias = Param.Unsigned(10, "Log size of Bias tables")
+
+    #gnb = Param.Unsigned(2, "Num global branch GEHL lengths")
+    gnb = Param.Unsigned(4, "Num global branch GEHL lengths")
+    #gm = VectorParam.Int([6, 3], "Global branch GEHL lengths")
+    #gm = VectorParam.Int([16, 8], "Global branch GEHL lengths")
+    gm = VectorParam.Int([60, 32, 16, 8], "Global branch GEHL lengths")
+    logGnb = Param.Unsigned(11, "Log number of global branch GEHL entries")
+
+    logSizeUp = Param.Unsigned(6,
+        "Log size of update threshold counters tables")
+
+    chooserConfWidth = Param.Unsigned(7,
+        "Number of bits for the chooser counters")
+
+    updateThresholdWidth = Param.Unsigned(12,
+        "Number of bits for the update threshold counter")
+
+    pUpdateThresholdWidth = Param.Unsigned(8,
+        "Number of bits for the pUpdate threshold counters")
+
+    extraWeightsWidth = Param.Unsigned(6,
+        "Number of bits for the extra weights")
+
+    scCountersWidth = Param.Unsigned(6, "Statistical corrector counters width")
+
+    initialUpdateThresholdValue = Param.Int(0,
+        "Initial pUpdate threshold counter value")
+
+class LOOP_PRED_BLK(SimObject):
+    type = 'LOOP_PRED_BLK'
+    cxx_class = 'gem5::branch_prediction::LOOP_PRED_BLK'
+    cxx_header = 'cpu/pred/dppred_blk/loop_pred_blk.hh'
+
+    #this size includes all ways
+    logSizeLoopPred = Param.Unsigned(7, "Log size of the loop predictor")
+    withLoopBits = Param.Unsigned(7, "Size of the WITHLOOP counter")
+    loopTableAgeBits = Param.Unsigned(8, "Number of age bits per loop entry")
+    loopTableConfidenceBits = Param.Unsigned(3,
+            "Number of confidence bits per loop entry")
+    loopTableTagBits = Param.Unsigned(14, "Number of tag bits per loop entry")
+    loopTableIterBits = Param.Unsigned(14, "Nuber of iteration bits per loop")
+    logLoopTableAssoc = Param.Unsigned(2, "Log loop predictor associativity")
+
+    # Add speculation
+    useSpeculation = Param.Bool(True, "Use speculation")
+
+    # Add hashing for calculating the loop table index
+    useHashing = Param.Bool(False, "Use hashing")
+
+    # Add a direction bit to the loop table entries
+    useDirectionBit = Param.Bool(False, "Use direction info")
+
+    # If true, use random to decide whether to allocate or not, and only try
+    # with one entry
+    restrictAllocation = Param.Bool(False,
+        "Restrict the allocation conditions")
+
+    initialLoopIter = Param.Unsigned(1, "Initial iteration number")
+    initialLoopAge = Param.Unsigned(255, "Initial age value")
+    optionalAgeReset = Param.Bool(True,
+        "Reset age bits optionally in some cases")
+
+class ITTAGE_BLK(SimObject):
+    type = 'ITTAGE_BLK'
+    cxx_class = 'gem5::branch_prediction::ITTAGE_BLK'
+    cxx_header = "cpu/pred/dppred_blk/ittage_blk.hh"
+
+    numThreads = Param.Unsigned(Parent.numThreads, "Number of threads")
+    instShiftAmt = Param.Unsigned(1,
+        "Number of bits to shift instructions by")
+
+    nHistoryTables = Param.Unsigned(5, "Number of history tables") #5
+    histLengths = VectorParam.Unsigned(
+        [0, 4, 8, 13, 16, 32], "global history length")
+
+    #history length of base table and ittage table
+    tagTableTagWidths = VectorParam.Unsigned(
+        [0, 9, 9, 9, 9, 9], "Tag size in ITTAGE tag tables")
+    #log2 table size of base table and ittage table
+    logTagTableSizes = VectorParam.Int(
+        [0, 8, 8, 9, 9, 9], "Log2 of ITTAGE table sizes")
+
+    tagTableCounterBits = Param.Unsigned(2, "Number of tag table counter bits")
+    tagTableUBits = Param.Unsigned(2, "Number of tag table u bits")
+
+    histBufferSize = Param.Unsigned(2097152,
+            "A large number to track all branch histories(2MEntries default)")
+
+    pathHistBits = Param.Unsigned(16, "Path history size")
+
+    logUResetPeriod = Param.Unsigned(8,
+        "Log period in number of branches to reset ITTAGE useful counters")
+    initialTCounterValue = Param.Int(0, "Initial value of tCounter")
+
+    maxNumAlloc = Param.Unsigned(1,
+        "Max number of TAGE entries allocted on mispredict") #1
+
+    # List of enabled TAGE tables. If empty, all are enabled
+    noSkip = VectorParam.Bool([], "Vector of enabled ITTAGE tables")
+
+    speculativeHistUpdate = Param.Bool(True,
+        "Use speculative update for histories")
+
+class TAGE_SC_I_BLK(SimObject):
+    type = 'TAGE_SC_I_BLK'
+    cxx_class = 'gem5::branch_prediction::TAGE_SC_I_BLK'
+    cxx_header = "cpu/pred/dppred_blk/tage_sc_i_blk.hh"
+
+    enableSC = Param.Bool(True, "enable SC predictor")
+    enableSLoopPred = Param.Bool(True, "enable loop predictor")
+    ubtb_blk = Param.UBTB_BLK(UBTB_BLK(), "UBTB_BLK object")
+    btb_tage = Param.BTB_TAGE(BTB_TAGE(), "BTB_TAGE object")
+    ras_blk  = Param.RAS_BLK(RAS_BLK(), "RAS_BLK object")
+    ittage_blk  = Param.ITTAGE_BLK(ITTAGE_BLK(), "ITTAGE_BLK object")
+    new_sc_blk  = Param.New_SC_BLK(New_SC_BLK(), "New_SC_BLK object")
+    loop_pred_blk  = Param.LOOP_PRED_BLK(LOOP_PRED_BLK(),
+                                         "LOOP_PRED_BLK object")
+
+class FTQ(SimObject):
+    type = 'FTQ'
+    cxx_class = 'gem5::branch_prediction::FTQ'
+    cxx_header = "cpu/pred/dppred_blk/ftq.hh"
+
+    ftqSize = Param.Unsigned(64, "Depth of ftq")
+
+class DecoupledBPU(SimObject):
+    type = 'DecoupledBPU'
+    cxx_class = 'gem5::branch_prediction::DecoupledBPU'
+    cxx_header = "cpu/pred/dppred_blk/DecoupledBPU.hh"
+
+    tage_sc_i_blk = Param.TAGE_SC_I_BLK(TAGE_SC_I_BLK(),
+                                        "TAGE_SC_I_BLK object")
+    ftq = Param.FTQ(FTQ(), "FTQ object")
