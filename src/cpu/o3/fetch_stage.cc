@@ -98,8 +98,6 @@ FetchStage::FetchStage(CPU *_cpu, const BaseO3CPUParams &params)
       commitToFetchDelay(params.commitToFetchDelay),
       fetchWidth(params.fetchWidth),
       decodeWidth(params.decodeWidth),
-      retryPkt(NULL),
-      retryPkt1(NULL),
       retryTid(InvalidThreadID),
       cacheBlkSize(cpu->cacheLineSize()),
       fetchBufferSize(params.fetchBufferSize),
@@ -176,6 +174,7 @@ FetchStage::FetchStage(CPU *_cpu, const BaseO3CPUParams &params)
 
     ftqInfoBufferMaxSize = bpuToIfuDelay + 1;
     ftb_false_hit = 0;
+    prefetchCount = 0;
 }
 
 std::string FetchStage::name() const { return cpu->name() + ".fetch_stage"; }
@@ -413,14 +412,16 @@ FetchStage::processCacheCompletion(PacketPtr pkt)
     // to return.
     if (!isStatus(pkt->req, IcacheWaitResponse)) {
         bool is_prefetch = pkt->req->isPrefetch();
-        std::string str_fetch = "after squash";
         if (is_prefetch) {
-          str_fetch = "for prefetch";
+          assert(prefetchCount > 0);
+          DPRINTF(Fetch, "[tid:%i] prefetch iCache completed, size:%d."
+              "req:%x\n", tid, prefetchCount, pkt->req.get());
+          prefetchCount--;
         } else {
           ++fetchStats.icacheSquashes;
+          DPRINTF(Fetch, "[tid:%i] Ignoring iCache completed after squash."
+              "req:%x\n", tid, pkt->req.get());
         }
-        DPRINTF(Fetch, "[tid:%i] Ignoring iCache completed %s. req:%x\n",
-            tid, str_fetch.c_str(), pkt->req.get());
         eraseReq(pkt->req, FetchReqStatus::Finish);
         delete pkt;
         return;
@@ -472,8 +473,7 @@ void
 FetchStage::drainSanityCheck() const
 {
     assert(isDrained());
-    assert(retryPkt == NULL);
-    assert(retryPkt1 == NULL);
+    assert(retryPktQ.empty());
     assert(retryTid == InvalidThreadID);
     assert(!cacheBlocked);
     assert(!interruptPending);
@@ -728,13 +728,9 @@ FetchStage::finishTranslation(const Fault &fault, const RequestPtr &mem_req)
             if (is_prefetch) {
                 eraseReq(mem_req, FetchReqStatus::Finish);
             } else {
-                assert((retryPkt == NULL) || (retryPkt1 == NULL));
+                assert(retryPktQ.size() <= 2);
                 setReqStatus(mem_req, IcacheWaitRetry);
-                if (retryPkt == nullptr) {
-                    retryPkt = data_pkt;
-                } else {
-                    retryPkt1 = data_pkt;
-                }
+                retryPktQ.push(data_pkt);
                 retryTid = tid;
                 cacheBlocked = true;
             }
@@ -797,26 +793,20 @@ FetchStage::intraSquash(ThreadID tid, std::vector<unsigned>& squashed_ftq_idxs)
         }
 
         // squash retryPkt req
-        if (retryPkt != nullptr) {
-            auto retry_req = retryPkt->req;
+        while (!retryPktQ.empty()) {
+            auto retry_pkt = retryPktQ.front();
+            auto retry_req = retry_pkt->req;
             if (idx == getReqFetchInfo(retry_req).ftqIdx) {
                 DPRINTF(Fetch, "squashed retry req:%x\n", retry_req.get());
-                delete retryPkt;
-                retryPkt = nullptr;
+                delete retry_pkt;
+                retry_pkt = nullptr;
+                retryPktQ.pop();
+            } else {
+                break;
             }
-        }
-        if (retryPkt1 != nullptr) {
-            auto retry_req = retryPkt1->req;
-            if (idx == getReqFetchInfo(retry_req).ftqIdx) {
-                DPRINTF(Fetch, "squashed retry req:%x\n", retry_req.get());
-                delete retryPkt1;
-                retryPkt1 = nullptr;
-            }
-        }
-        if ((retryPkt == nullptr) && (retryPkt1 != nullptr)) {
-            retryPkt = retryPkt1;
-            retryPkt1 = nullptr;
-        } else if ((retryPkt == nullptr) && (retryPkt1 == nullptr)) {
+        };
+
+        if (retryPktQ.empty()) {
             retryTid = InvalidThreadID;
         }
     }
@@ -848,13 +838,12 @@ FetchStage::tick0Squash(void)
     // Get rid of the retrying packet if it was from this thread.
     if (retryTid == 0) {
         assert(cacheBlocked);
-        if (retryPkt != nullptr) {
-            delete retryPkt;
-            retryPkt = NULL;
-        }
-        if (retryPkt1 != nullptr) {
-            delete retryPkt1;
-            retryPkt1 = NULL;
+        while (!retryPktQ.empty())
+        {
+          auto retry_pkt = retryPktQ.front();
+          delete retry_pkt;
+          retry_pkt = NULL;
+          retryPktQ.pop();
         }
         retryTid = InvalidThreadID;
     }
@@ -1619,7 +1608,8 @@ FetchStage::tick0()
 
     // proc prefetch
     FtqPrefetchInfo& prefetch_info = new_ftq_info.instBlkPrefetchInfo;
-    if (enInstPrefetch && prefetch_info.valid) {
+    if (enInstPrefetch && prefetch_info.valid
+        && (prefetchCount < prefetchMax)) {
         DPRINTF(Fetch, "Get prefetch ftq info, startAddr:%x \n",
                   prefetch_info.startAddr);
         auto& ftq_info = ftqFetchInfoBuffer.front();
@@ -1646,6 +1636,7 @@ FetchStage::tick0()
             prefetchReq[tid] = pipelineIcacheAccesses(tid, start_addr,
                                                       ftq_info, true);
             if (prefetchReq[tid].size() > 0) {
+                prefetchCount++;
                 DPRINTF(Fetch, "[tid:%i] prefetch new req: %x\n",
                     tid, prefetchReq[tid].at(0).get());
             }
@@ -2177,34 +2168,32 @@ FetchStage::predecode(std::vector<RequestPtr>& reqs, unsigned ftq_idx)
 void
 FetchStage::recvReqRetry()
 {
-    if (retryPkt != NULL) {
+    if (!retryPktQ.empty()) {
         assert(cacheBlocked);
         assert(retryTid != InvalidThreadID);
         //assert(fetchStatus[retryTid] == IcacheWaitRetry);
-        DPRINTF(Fetch, "recvReqRetry, req:%x, req1%x.\n",
-                retryPkt->req.get(),
-                (retryPkt1==nullptr) ? 0 : retryPkt1->req.get());
+        auto retry_pkt = retryPktQ.front();
+        DPRINTF(Fetch, "recvReqRetry, req:%x, size:%d.\n",
+                retry_pkt->req.get(), retryPktQ.size());
 
-        assert(isStatus(retryPkt->req, IcacheWaitRetry));
-        if (icachePort.sendTimingReq(retryPkt)) {
+        assert(isStatus(retry_pkt->req, IcacheWaitRetry));
+        if (icachePort.sendTimingReq(retry_pkt)) {
+            retryPktQ.pop();
             //fetchStatus[retryTid] = IcacheWaitResponse;
-            setReqStatus(retryPkt->req, IcacheWaitResponse);
+            setReqStatus(retry_pkt->req, IcacheWaitResponse);
             // Notify Fetch Request probe when a retryPkt is successfully sent.
             // Note that notify must be called before retryPkt is set to NULL.
-            ppFetchRequestSent->notify(retryPkt->req);
-            if (retryPkt1 != nullptr) {
-                retryPkt = retryPkt1;
-                retryPkt1 = NULL;
-
-                if (icachePort.sendTimingReq(retryPkt)) {
-                    setReqStatus(retryPkt->req, IcacheWaitResponse);
-                    ppFetchRequestSent->notify(retryPkt->req);
-                    retryPkt = NULL;
+            ppFetchRequestSent->notify(retry_pkt->req);
+            if (!retryPktQ.empty()) {
+                retry_pkt = retryPktQ.front();
+                if (icachePort.sendTimingReq(retry_pkt)) {
+                    retryPktQ.pop();
+                    setReqStatus(retry_pkt->req, IcacheWaitResponse);
+                    ppFetchRequestSent->notify(retry_pkt->req);
                     retryTid = InvalidThreadID;
                     cacheBlocked = false;
                 }
             } else {
-                retryPkt = NULL;
                 retryTid = InvalidThreadID;
                 cacheBlocked = false;
             }
@@ -2404,17 +2393,12 @@ FetchStage::pipelineIcacheAccesses(ThreadID tid,
     //if (cacheBlocked) {
     if (req_invalid) {
         if (!is_prefetch) {
-            if (retryPkt != nullptr) {
-                DPRINTF(Fetch,"invalid req and rm retryPkt, req: %x.\n",
-                    retryPkt->req.get());
-                delete retryPkt;
-                retryPkt = NULL;
-            }
-            if (retryPkt1 != nullptr) {
-                DPRINTF(Fetch,"invalid req and rm retryPkt, req: %x.\n",
-                    retryPkt1->req.get());
-                delete retryPkt1;
-                retryPkt1 = NULL;
+            while (!retryPktQ.empty())
+            {
+              auto retry_pkt = retryPktQ.front();
+              delete retry_pkt;
+              retry_pkt = NULL;
+              retryPktQ.pop();
             }
             retryTid = InvalidThreadID;
             cacheBlocked = false;

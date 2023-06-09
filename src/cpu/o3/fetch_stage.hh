@@ -241,6 +241,10 @@ class FetchStage
     /** Enable inst prefetch **/
     bool enInstPrefetch;
 
+    /** prefetch cmd count **/
+    const unsigned prefetchMax = 4;
+    unsigned prefetchCount;
+
   public:
     /** Fetch constructor. */
     FetchStage(CPU *_cpu, const BaseO3CPUParams &params);
@@ -616,8 +620,7 @@ class FetchStage
     bool cacheBlocked;
 
     /** The packet that is waiting to be retried. */
-    PacketPtr retryPkt;
-    PacketPtr retryPkt1;
+    std::queue<PacketPtr> retryPktQ;
 
     /** The thread that is waiting on the cache to tell fetch to retry. */
     ThreadID retryTid;
