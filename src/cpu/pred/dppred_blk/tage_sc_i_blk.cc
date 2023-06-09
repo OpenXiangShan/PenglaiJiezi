@@ -48,7 +48,6 @@ namespace gem5
 {
 namespace branch_prediction
 {
-/** 构造函数 */
 TAGE_SC_I_BLK::TAGE_SC_I_BLK(const TAGE_SC_I_BLKParams &params):
                     SimObject(params),
                     enableSC(params.enableSC),

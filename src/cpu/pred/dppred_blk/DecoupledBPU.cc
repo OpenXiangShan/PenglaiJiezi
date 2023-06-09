@@ -53,7 +53,6 @@ namespace gem5
 
 namespace branch_prediction
 {
-/** 构造函数 */
 DecoupledBPU::DecoupledBPU(const DecoupledBPUParams &params):
             SimObject(params), tage_sc_i_blk(params.tage_sc_i_blk),
             ftq(params.ftq), S1Queue(10,10),
