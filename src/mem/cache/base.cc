@@ -339,7 +339,7 @@ BaseCache::handleTimingReqMiss(PacketPtr pkt, MSHR *mshr, CacheBlk *blk,
                 // We use forward_time here because there is an
                 // uncached memory write, forwarded to WriteBuffer.
                 allocateWriteBuffer(pkt, forward_time);
-            } else {
+            } else if (pkt->cmd != MemCmd::HardPFReq) {
                 DPRINTF(Cache, "%s coalescing MSHR for %s\n", __func__,
                         pkt->print());
 
@@ -1762,7 +1762,7 @@ void
 BaseCache::invalidateBlock(CacheBlk *blk)
 {
     // If block is still marked as prefetched, then it hasn't been used
-    if (blk->wasPrefetched()) {
+    if (blk->wasPrefetched() && prefetcher) {
         prefetcher->prefetchUnused();
     }
 

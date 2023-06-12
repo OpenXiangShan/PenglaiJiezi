@@ -189,7 +189,7 @@ FetchStage::regProbePoints()
 }
 
 FetchStage::FetchStatGroup::FetchStatGroup(CPU *cpu, FetchStage *fetch)
-    : statistics::Group(cpu, "fetch_stage"),
+    : statistics::Group(cpu, "fetch"),
     ADD_STAT(ftqStallCycles, statistics::units::Cycle::get(),
              "Number of cycles ifu wait ftq cmd"),
     ADD_STAT(icacheStallCycles, statistics::units::Cycle::get(),
@@ -410,8 +410,8 @@ FetchStage::processCacheCompletion(PacketPtr pkt)
 
     // Only change the status if it's still waiting on the icache access
     // to return.
-    if (!isStatus(pkt->req, IcacheWaitResponse)) {
-        bool is_prefetch = pkt->req->isPrefetch();
+    bool is_prefetch = pkt->req->isPrefetch();
+    if (!isStatus(pkt->req, IcacheWaitResponse) || is_prefetch) {
         if (is_prefetch) {
           assert(prefetchCount > 0);
           DPRINTF(Fetch, "[tid:%i] prefetch iCache completed, size:%d."
@@ -660,13 +660,11 @@ FetchStage::fetchCacheLine(Addr vaddr, ThreadID tid,
         flag_type, cpu->instRequestorId(), pc,
         cpu->thread[tid]->contextId());
 
-#if 0 // TODO
     if (enInstPrefetch && is_prefetch) {
       mem_req->setCacheOrgId(0);// id=0:iCache
                                 // TODO, from icache->getCacheOrgId()
       mem_req->setPrefetchTgtId(2); // id=2:L2
     }
-#endif
 
     mem_req->taskId(cpu->taskId());
     pushReqToList(mem_req, this_pc);
@@ -727,6 +725,7 @@ FetchStage::finishTranslation(const Fault &fault, const RequestPtr &mem_req)
             DPRINTF(Fetch, "[tid:%i] Out of MSHRs!\n", tid);
             if (is_prefetch) {
                 eraseReq(mem_req, FetchReqStatus::Finish);
+                prefetchCount--;
             } else {
                 assert(retryPktQ.size() <= 2);
                 setReqStatus(mem_req, IcacheWaitRetry);
@@ -740,11 +739,8 @@ FetchStage::finishTranslation(const Fault &fault, const RequestPtr &mem_req)
             DPRINTF(Activity, "[tid:%i] Activity: Waiting on I-cache "
                     "response.\n", tid);
             lastIcacheStall[tid] = curTick();
-            if (!is_prefetch) {
-                setReqStatus(mem_req, IcacheWaitResponse);
-            } else {
-                eraseReq(mem_req, FetchReqStatus::Finish);
-            }
+            setReqStatus(mem_req, IcacheWaitResponse);
+
             // Notify Fetch Request probe when a packet containing a fetch
             // request is successfully sent
             ppFetchRequestSent->notify(mem_req);
