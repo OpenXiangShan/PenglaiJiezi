@@ -101,6 +101,7 @@ Base::Base(const BasePrefetcherParams &p)
       pageBytes(p.page_bytes),
       prefetchOnAccess(p.prefetch_on_access),
       prefetchOnPfHit(p.prefetch_on_pf_hit),
+      prefetchTargetCacheDelta(p.prefetch_target_id_delta),
       useVirtualAddresses(p.use_virtual_addresses),
       prefetchStats(this), issuedPrefetches(0),
       usefulPrefetches(0), tlb(nullptr)

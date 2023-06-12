@@ -78,6 +78,7 @@ class BaseCache(ClockedObject):
 
     size = Param.MemorySize("Capacity")
     assoc = Param.Unsigned("Associativity")
+    cache_org_id = Param.Unsigned(0xff, "cache original id")
 
     tag_latency = Param.Cycles("Tag lookup latency")
     data_latency = Param.Cycles("Data access latency")

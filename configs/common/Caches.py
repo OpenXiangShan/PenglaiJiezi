@@ -62,6 +62,7 @@ class L1_ICache(L1Cache):
     tag_latency = 1
     data_latency = 1
     sequential_access = False
+    cache_org_id = 0
 
     response_latency = 4
 
@@ -69,6 +70,7 @@ class L1_DCache(L1Cache):
     mshrs = 16
     # always writeback clean when lower level is exclusive
     writeback_clean = True
+    cache_org_id = 1
 
     # aligned latency:
     tag_latency = 1
@@ -85,6 +87,7 @@ class L2Cache(Cache):
     #prefetch_on_access = False
     # always writeback clean when lower level is exclusive
     writeback_clean = True
+    cache_org_id = 2
 
     # aligned latency:
     tag_latency = 2
@@ -99,6 +102,7 @@ class L3Cache(Cache):
     tgts_per_mshr = 20
     clusivity='mostly_excl'
     writeback_clean = False
+    cache_org_id = 3
 
     # aligned latency:
     tag_latency = 2

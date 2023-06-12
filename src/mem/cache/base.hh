@@ -932,11 +932,17 @@ class BaseCache : public ClockedObject
     bool forwardSnoops;
 
     /**
+     * Cache id, 0: l1i, 1: l1d, 2:l2, 3:l3.
+     */
+    uint8_t cacheOrgId;
+
+    /**
      * Clusivity with respect to the upstream cache, determining if we
      * fill into both this cache and the cache above on a miss. Note
      * that we currently do not support strict clusivity policies.
      */
     const enums::Clusivity clusivity;
+
 
     /**
      * Is this cache read only, for example the instruction cache, or
@@ -1034,6 +1040,10 @@ class BaseCache : public ClockedObject
         statistics::Vector mshrHits;
         /** Number of misses that miss in the MSHRs, per command and thread. */
         statistics::Vector mshrMisses;
+        /** Number of allocations for normal request*/
+        statistics::Vector allocOnFillNormal;
+        /** Number of allocations for prefetch request*/
+        statistics::Vector allocOnFillPrefetch;
         /** Number of misses that miss in the MSHRs, per command and thread. */
         statistics::Vector mshrUncacheable;
         /** Total tick latency of each MSHR miss, per command and thread. */
@@ -1064,6 +1074,12 @@ class BaseCache : public ClockedObject
         statistics::Formula demandHits;
         /** Number of hit for all accesses. */
         statistics::Formula overallHits;
+        /** Number of allocations on normal fill. */
+        statistics::Formula allocOnFillNormal;
+        /** Number of allocations on prefetch fill. */
+        statistics::Formula allocOnFillPrefetch;
+        /** Number of allocations on cache fill. */
+        statistics::Formula overallAllocOnFill;
         /** Total number of ticks spent waiting for demand hits. */
         statistics::Formula demandHitLatency;
         /** Total number of ticks spent waiting for all hits. */
@@ -1177,13 +1193,72 @@ class BaseCache : public ClockedObject
         return blkSize;
     }
 
+    /**
+     * getCacheOrgId
+    */
+    uint8_t getCacheOrgId() const { return cacheOrgId; }
+
     const AddrRangeList &getAddrRanges() const { return addrRanges; }
 
     MSHR *allocateMissBuffer(PacketPtr pkt, Tick time, bool sched_send = true)
     {
-        MSHR *mshr = mshrQueue.allocate(pkt->getBlockAddr(blkSize), blkSize,
-                                        pkt, time, order++,
-                                        allocOnFill(pkt->cmd));
+        MSHR *mshr = nullptr;
+        bool allocate_on_fill = false;
+
+        if ( pkt->req->isPrefetch() ) {
+            // if this pkt is not send from current cache,
+            // but the target of the packet is current cache, allocate it
+            // for example, l1d prefetch to l2, current is l2
+            if ( pkt->req->getCacheOrgId() != cacheOrgId &&
+                 pkt->req->getPrefetchTgtId() == cacheOrgId ) {
+                allocate_on_fill = true;
+            }
+            // for example, l1d prefetch to l2, current is l3
+            else if ( pkt->req->getCacheOrgId() != cacheOrgId &&
+                 pkt->req->getPrefetchTgtId() != cacheOrgId ) {
+                allocate_on_fill = allocOnFill(pkt->cmd);
+            }
+            // for example, l1d prefetch to l1d (no prefetch to next level),
+            // current is l1d
+            else if (pkt->req->getCacheOrgId() == cacheOrgId &&
+                pkt->req->getPrefetchTgtId() == cacheOrgId ) {
+                allocate_on_fill = allocOnFill(pkt->cmd);
+            }
+            // for example, l1d prefetch to l2, current is l1d
+            else if (pkt->req->getCacheOrgId() == cacheOrgId &&
+                pkt->req->getPrefetchTgtId() != cacheOrgId ) {
+                allocate_on_fill = false;
+            }
+            else {
+                assert(false);
+            }
+
+            DPRINTF(Cache, "Prefetch: allocOnFill = %s,"
+                    " %d prefetch to %d, current is %d,"
+                    " pkt: %s\n",
+                    allocate_on_fill? "true" : "false",
+                    pkt->req->getCacheOrgId(),
+                    pkt->req->getPrefetchTgtId(),
+                    cacheOrgId,
+                    pkt->print());
+
+            if (allocate_on_fill)
+                stats.cmdStats(pkt).allocOnFillPrefetch[
+                    pkt->req->requestorId()]++;
+        }
+        else {
+            allocate_on_fill = allocOnFill(pkt->cmd);
+            DPRINTF(Cache, "normal: allocOnFill = %s, "
+            " pkt: %s\n",
+                allocate_on_fill? "true" : "false",
+                pkt->print());
+            if (allocate_on_fill)
+                stats.cmdStats(pkt).allocOnFillNormal[
+                    pkt->req->requestorId()]++;
+        }
+
+        mshr = mshrQueue.allocate(pkt->getBlockAddr(blkSize), blkSize,
+                        pkt, time, order++, allocate_on_fill);
 
         if (mshrQueue.isFull()) {
             setBlocked((BlockedCause)MSHRQueue_MSHRs);
@@ -1236,6 +1311,7 @@ class BaseCache : public ClockedObject
     {
         return blocked != 0;
     }
+
 
     /**
      * Marks the access path of the cache as blocked for the given cause. This

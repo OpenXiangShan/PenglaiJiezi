@@ -1335,7 +1335,6 @@ InstructionQueue::doSquash(ThreadID tid)
                 dependGraph.clearInst(dest_reg->flatIndex());
             }
         }
-
         instList[tid].erase(squash_it--);
         ++iqStats.squashedInstsExamined;
     }

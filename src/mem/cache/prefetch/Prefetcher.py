@@ -69,6 +69,8 @@ class BasePrefetcher(ClockedObject):
 
     # Get the block size from the parent (system)
     block_size = Param.Int(Parent.cache_line_size, "Block size in bytes")
+    prefetch_target_id_delta = Param.Unsigned(0,
+                "prefetch target cache delta")
 
     on_miss = Param.Bool(False, "Only notify prefetcher on misses")
     on_read = Param.Bool(True, "Notify prefetcher on reads")
@@ -267,6 +269,68 @@ class IndirectMemoryPrefetcher(QueuedPrefetcher):
     )
 
 
+class SignaturePathPrefetcherToLowerLevel(QueuedPrefetcher):
+    type = "SignaturePathPrefetcher"
+    cxx_class = "gem5::prefetch::SignaturePath"
+    cxx_header = "mem/cache/prefetch/signature_path.hh"
+
+    signature_shift = Param.UInt8(
+        3, "Number of bits to shift when calculating a new signature"
+    )
+    prefetch_target_id_delta = Param.Unsigned(1,
+                                            "prefetch target cache delta")
+
+    signature_bits = Param.UInt16(12, "Size of the signature, in bits")
+    signature_table_entries = Param.MemorySize(
+        "1024", "Number of entries of the signature table"
+    )
+    signature_table_assoc = Param.Unsigned(
+        2, "Associativity of the signature table"
+    )
+    signature_table_indexing_policy = Param.BaseIndexingPolicy(
+        SetAssociative(
+            entry_size=1,
+            assoc=Parent.signature_table_assoc,
+            size=Parent.signature_table_entries,
+        ),
+        "Indexing policy of the signature table",
+    )
+    signature_table_replacement_policy = Param.BaseReplacementPolicy(
+        LRURP(), "Replacement policy of the signature table"
+    )
+
+    num_counter_bits = Param.UInt8(
+        3, "Number of bits of the saturating counters"
+    )
+    pattern_table_entries = Param.MemorySize(
+        "4096", "Number of entries of the pattern table"
+    )
+    pattern_table_assoc = Param.Unsigned(
+        1, "Associativity of the pattern table"
+    )
+    strides_per_pattern_entry = Param.Unsigned(
+        4, "Number of strides stored in each pattern entry"
+    )
+    pattern_table_indexing_policy = Param.BaseIndexingPolicy(
+        SetAssociative(
+            entry_size=1,
+            assoc=Parent.pattern_table_assoc,
+            size=Parent.pattern_table_entries,
+        ),
+        "Indexing policy of the pattern table",
+    )
+    pattern_table_replacement_policy = Param.BaseReplacementPolicy(
+        LRURP(), "Replacement policy of the pattern table"
+    )
+
+    prefetch_confidence_threshold = Param.Float(
+        0.5, "Minimum confidence to issue prefetches"
+    )
+    lookahead_confidence_threshold = Param.Float(
+        0.75, "Minimum confidence to continue exploring lookahead entries"
+    )
+
+
 class SignaturePathPrefetcher(QueuedPrefetcher):
     type = "SignaturePathPrefetcher"
     cxx_class = "gem5::prefetch::SignaturePath"
@@ -420,6 +484,58 @@ class AMPMPrefetcher(QueuedPrefetcher):
     ampm = Param.AccessMapPatternMatching(
         AccessMapPatternMatching(), "Access Map Pattern Matching object"
     )
+class BingoPrefetcher(QueuedPrefetcher):
+    type = 'BingoPrefetcher'
+    cxx_class = 'gem5::prefetch::Bingo'
+    cxx_header = "mem/cache/prefetch/bingo.hh"
+
+    #block_size = Param.Unsigned(Parent.block_size,
+    #        "Block size in bytes")
+
+    pc_width = Param.Unsigned(16,
+        "PC width used to index the PHT")
+    max_addr_width = Param.Unsigned(16,
+        "Max addr width used to index the PHT")
+    min_addr_width = Param.Unsigned(5,
+        "Min addr width used to index the PHT")
+    region_size = Param.Unsigned(2048,
+        "region size")
+    pht_vote_threshold = Param.Float(0.20,
+        "threshold for PHT index vote")
+    at_entry_count = Param.MemorySize("128",
+        "Number of entries in accumulation table")
+    at_assoc = Param.Unsigned(16,
+        "Associativity of the accumulation table")
+    at_indexing_policy = Param.BaseIndexingPolicy(
+        SetAssociative(entry_size = 1, assoc = Parent.at_assoc,
+        size = Parent.at_entry_count),
+        "Indexing policy of the accumulation table")
+    at_replacement_policy = Param.BaseReplacementPolicy(LRURP(),
+            "Replacement policy of the accumulation table")
+    filter_table_entry_count = Param.MemorySize("64",
+        "Number of entries in filter table")
+    filter_table_assoc = Param.Unsigned(16,
+        "Associativity of the filter table table")
+    filter_table_indexing_policy = Param.BaseIndexingPolicy(
+        SetAssociative(entry_size = 1, assoc = Parent.filter_table_assoc,
+        size = Parent.filter_table_entry_count),
+        "Indexing policy of the filter table")
+    filter_table_replacement_policy = Param.BaseReplacementPolicy(LRURP(),
+        "Replacement policy of the filter table")
+    pht_entry_count = Param.MemorySize("16384",
+        "Number of entries in pattern history table")
+    pht_assoc = Param.Unsigned(16,
+        "Associativity of the pattern history table")
+    pht_indexing_policy = Param.BaseIndexingPolicy(
+        SetAssociative(entry_size = 1,
+            assoc = Parent.pht_assoc,
+            size = Parent.pht_entry_count),
+        "Indexing policy of the pattern history table")
+    pht_replacement_policy = Param.BaseReplacementPolicy(LRURP(),
+            "Replacement policy of the pattern history table")
+    epoch_cycles = Param.Cycles(256000, "Cycles in an epoch period")
+
+
 
 
 class DeltaCorrelatingPredictionTables(SimObject):

@@ -103,6 +103,7 @@ BaseCache::BaseCache(const BaseCacheParams &p, unsigned blk_size)
       sequentialAccess(p.sequential_access),
       numTarget(p.tgts_per_mshr),
       forwardSnoops(true),
+      cacheOrgId(p.cache_org_id),
       clusivity(p.clusivity),
       isReadOnly(p.is_read_only),
       replaceExpansions(p.replace_expansions),
@@ -130,6 +131,7 @@ BaseCache::BaseCache(const BaseCacheParams &p, unsigned blk_size)
     tags->tagsInit();
     if (prefetcher)
         prefetcher->setCache(this);
+
 
     fatal_if(compressor && !dynamic_cast<CompressedTags*>(tags),
         "The tags of compressed cache %s must derive from CompressedTags",
@@ -484,6 +486,20 @@ BaseCache::recvTimingReq(PacketPtr pkt)
               pc, source, paddr, vaddr, curCycle, this->name().c_str());
         }
 
+        // when the req come from above cache, it is a prefetch
+        // with prefetch to next level flag set, it only means the above
+        // cache will not allocate, this level cache should allocate it,
+        // so clear the flag for current level cache's request
+        if (pkt->req->isPrefetch()&&
+                pkt->req->pfTgtIDDiffWithCacheOrgID()){
+            // to tell allocOnFill that this is a prefetch to current level
+            // even current cache is not most_incl, still should allocate
+            // when current req is handled, it should be cleared
+            DPRINTF(Cache, "in func:%s, pfTgtID:%d, currentCacheId:%d\n",
+                    __func__,
+                    pkt->req->getPrefetchTgtId(),
+                    getCacheOrgId());
+        }
         handleTimingReqMiss(pkt, blk, forward_time, request_time);
 
         ppMiss->notify(pkt);
@@ -576,6 +592,12 @@ BaseCache::recvTimingResp(PacketPtr pkt)
 
     CacheBlk *blk = tags->findBlock(pkt->getAddr(), pkt->isSecure());
 
+    DPRINTF(CacheVerbose, "MSHR %#lx, isForward:%s\n",
+            mshr, mshr->isForward?"Yes":"No");
+
+    DPRINTF(CacheVerbose, "MSHR %#lx mshr->allocOnFill():%s\n",
+                    mshr, mshr->allocOnFill()? "true":"false");
+
     if (is_fill && !is_error) {
         DPRINTF(Cache, "Block for addr %#llx being updated in Cache\n",
                 pkt->getAddr());
@@ -645,6 +667,7 @@ BaseCache::recvTimingResp(PacketPtr pkt)
 
         // if we used temp block, check to see if its valid and then clear it
         if (blk == tempBlock && tempBlock->isValid()) {
+            DPRINTF(CacheVerbose, "Using tempBlock, evict it\n");
             evictBlock(blk, writebacks);
         }
     }
@@ -956,8 +979,20 @@ BaseCache::getNextQueueEntry()
                 // allocate an MSHR and return it, note
                 // that we send the packet straight away, so do not
                 // schedule the send
+                DPRINTF(HWPrefetch, "Prefetch %#x allocate Missbuffer.\n",
+                                    pf_addr);
+                pkt->req->setCacheOrgId(getCacheOrgId());
+                pkt->req->setPrefetchTgtId(
+                        getCacheOrgId() + prefetcher->getPFTgtDelta());
+
+                DPRINTF(HWPrefetch, "pfTgtIDDiffWithCacheOrgID = :%s\n",
+                    pkt->req->pfTgtIDDiffWithCacheOrgID()?"true":"false");
+
                 return allocateMissBuffer(pkt, curTick(), false);
             }
+        }
+        else {
+            DPRINTF(HWPrefetch, "prefetcher->getPacket return null\n");
         }
     }
 
@@ -1268,7 +1303,7 @@ BaseCache::access(PacketPtr pkt, CacheBlk *&blk, Cycles &lat,
     Cycles tag_latency(0);
     blk = tags->accessBlock(pkt, tag_latency);
 
-    DPRINTF(Cache, "%s for %s %s\n", __func__, pkt->print(),
+    DPRINTF(Cache, "in func %s() for %s %s\n", __func__, pkt->print(),
             blk ? "hit " + blk->print() : "miss");
 
     if (pkt->req->isCacheMaintenance()) {
@@ -1394,7 +1429,8 @@ BaseCache::access(PacketPtr pkt, CacheBlk *&blk, Cycles &lat,
         assert(!pkt->needsResponse());
 
         updateBlockData(blk, pkt, has_old_data);
-        DPRINTF(Cache, "%s new state is %s\n", __func__, blk->print());
+        DPRINTF(Cache, "In func %s() new state is %s\n",
+                    __func__, blk->print());
         incHitCount(pkt);
 
         // When the packet metadata arrives, the tag lookup will be done while
@@ -1502,8 +1538,19 @@ BaseCache::access(PacketPtr pkt, CacheBlk *&blk, Cycles &lat,
 
         satisfyRequest(pkt, blk);
         assert(!blk->needInvalidate());
-        if (exclusiveCacheInvalidate(pkt->fromCache(), blk)) {
-            blk->setPendingInvalidate();
+
+        // if current cache is the target prefetch cache,
+        // and some cache above send the req, then
+        // we should not invalid the prefetch hit block, because
+        // rtl do so too.
+        if ( !( pkt->req->isPrefetch() &&
+                pkt->req->pfTgtIDDiffWithCacheOrgID() &&
+                (pkt->req->getPrefetchTgtId() == cacheOrgId) ) ) {
+            if (exclusiveCacheInvalidate(pkt->fromCache(), blk)) {
+                DPRINTF(Cache, "exclusiveCacheInvalidate = true for blk %s\n",
+                            blk->print());
+                blk->setPendingInvalidate();
+            }
         }
 
         return true;
@@ -1539,6 +1586,8 @@ BaseCache::maintainClusivity(bool from_cache, CacheBlk *blk)
         // if we have responded to a cache, and our block is still
         // valid, but not dirty, and this cache is mostly exclusive
         // with respect to the cache above, drop the block
+        DPRINTF(Cache, "in func:%s, invalidBlock for blk %s\n",
+                     __func__, blk->print());
         invalidateBlock(blk);
     }
 }
@@ -1556,6 +1605,8 @@ BaseCache::handleFill(PacketPtr pkt, CacheBlk *blk, PacketList &writebacks,
     // When handling a fill, we should have no writes to this line.
     assert(addr == pkt->getBlockAddr(blkSize));
     assert(!writeBuffer.findMatch(addr, is_secure));
+    DPRINTF(Cache, "(pkt: %s) allocate=%s\n",
+                pkt->print(), allocate?"True":"False");
 
     if (!blk) {
         // better have read new data...
@@ -1571,8 +1622,19 @@ BaseCache::handleFill(PacketPtr pkt, CacheBlk *blk, PacketList &writebacks,
             // current request and then get rid of it
             blk = tempBlock;
             tempBlock->insert(addr, is_secure);
-            DPRINTF(Cache, "using temp block for %#llx (%s)\n", addr,
-                    is_secure ? "s" : "ns");
+
+            // if this is a prefetch, and the prefetchTgtId is not
+            // current cacheOrgId, and the original request is from
+            // current cacheOrgId, there is no need to writeback it
+            // if ( pkt->req->isPrefetch() &&
+            //     (pkt->req->getPrefetchTgtId() != cacheOrgId ) &&
+            //     (pkt->req->getCacheOrgId() == cacheOrgId) ) {
+            //         tempBlock->invalidate();
+            // }
+
+            DPRINTF(Cache, "using temp block for %#llx (%s), block: %s\n",
+                    addr, is_secure ? "s" : "ns",
+                    tempBlock->isValid() ? "valid" : "invalid");
         }
     } else {
         // existing block... probably an upgrade
@@ -1950,6 +2012,7 @@ BaseCache::sendMSHRQueuePacket(MSHR* mshr)
     mshr->isForward = (pkt == nullptr);
 
     if (mshr->isForward) {
+        DPRINTF(CacheVerbose, "MSHR %#lx isForward\n", mshr);
         // not a cache block request, but a response is expected
         // make copy of current packet to forward, keep current
         // copy for response handling
@@ -2091,6 +2154,10 @@ BaseCache::CacheCmdStats::CacheCmdStats(BaseCache &c,
                ("number of " + name + " MSHR hits").c_str()),
       ADD_STAT(mshrMisses, statistics::units::Count::get(),
                ("number of " + name + " MSHR misses").c_str()),
+      ADD_STAT(allocOnFillNormal, statistics::units::Count::get(),
+               ("number of " + name + " normal allocations").c_str()),
+      ADD_STAT(allocOnFillPrefetch, statistics::units::Count::get(),
+               ("number of " + name + " prefetch allocations").c_str()),
       ADD_STAT(mshrUncacheable, statistics::units::Count::get(),
                ("number of " + name + " MSHR uncacheable").c_str()),
       ADD_STAT(mshrMissLatency, statistics::units::Tick::get(),
@@ -2197,6 +2264,24 @@ BaseCache::CacheCmdStats::regStatsFromParent()
         mshrMisses.subname(i, system->getRequestorName(i));
     }
 
+    // allocations for normal request
+    allocOnFillNormal
+        .init(max_requestors)
+        .flags(total | nozero | nonan)
+        ;
+    for (int i = 0; i < max_requestors; i++) {
+        allocOnFillNormal.subname(i, system->getRequestorName(i));
+    }
+
+    // allocations for prefetch request
+    allocOnFillPrefetch
+        .init(max_requestors)
+        .flags(total | nozero | nonan)
+        ;
+    for (int i = 0; i < max_requestors; i++) {
+        allocOnFillPrefetch.subname(i, system->getRequestorName(i));
+    }
+
     // MSHR miss latency statistics
     mshrMissLatency
         .init(max_requestors)
@@ -2254,6 +2339,12 @@ BaseCache::CacheStats::CacheStats(BaseCache &c)
              "number of demand (read+write) hits"),
     ADD_STAT(overallHits, statistics::units::Count::get(),
              "number of overall hits"),
+    ADD_STAT(allocOnFillNormal, statistics::units::Count::get(),
+             "number of cache allocation on normal fill"),
+    ADD_STAT(allocOnFillPrefetch, statistics::units::Count::get(),
+             "number of cache allocation on prefetch fill"),
+    ADD_STAT(overallAllocOnFill, statistics::units::Count::get(),
+             "number of cache allocation fill"),
     ADD_STAT(demandHitLatency, statistics::units::Tick::get(),
              "number of demand (read+write) hit ticks"),
     ADD_STAT(overallHitLatency, statistics::units::Tick::get(),
@@ -2367,6 +2458,25 @@ BaseCache::CacheStats::regStats()
     for (int i = 0; i < max_requestors; i++) {
         overallHits.subname(i, system->getRequestorName(i));
     }
+
+    allocOnFillNormal.flags(total | nozero | nonan);
+    allocOnFillNormal = SUM_DEMAND(allocOnFillNormal);
+    for (int i = 0; i < max_requestors; i++) {
+        allocOnFillNormal.subname(i, system->getRequestorName(i));
+    }
+
+    allocOnFillPrefetch.flags(total | nozero | nonan);
+    allocOnFillPrefetch = SUM_DEMAND(allocOnFillPrefetch);
+    for (int i = 0; i < max_requestors; i++) {
+        allocOnFillPrefetch.subname(i, system->getRequestorName(i));
+    }
+
+    overallAllocOnFill.flags(total | nozero | nonan);
+    overallAllocOnFill = allocOnFillNormal + allocOnFillPrefetch;
+    for (int i = 0; i < max_requestors; i++) {
+        overallAllocOnFill.subname(i, system->getRequestorName(i));
+    }
+
 
     demandMisses.flags(total | nozero | nonan);
     demandMisses = SUM_DEMAND(misses);

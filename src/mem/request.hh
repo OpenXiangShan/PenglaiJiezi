@@ -429,6 +429,18 @@ class Request
     uint32_t _streamId = 0;
 
     /**
+     * The cacheID from which the prefetch request originated.
+     * This is used to determine the cache hierarchy level of the request.
+    */
+    uint8_t _cacheOrgId = -1;
+
+    /**
+     * The cacheID to which the prefetch request targeted. This is used
+     * to determine the target cache id the prefetch request
+    */
+    uint8_t _prefetchTgtId = -1;
+
+    /**
      * The substream ID identifies an "execution context" within a
      * device behind an SMMU/IOMMU. It's intended to map 1-to-1 to
      * PCIe PASID (Process Address Space ID). The presence of a
@@ -560,6 +572,26 @@ class Request
     void setReqNum(int num)
     {
         reqNum = num;
+    }
+
+    void setCacheOrgId(uint8_t num)
+    {
+        _cacheOrgId = num;
+    }
+
+    uint8_t getCacheOrgId()
+    {
+        return _cacheOrgId;
+    }
+
+    void setPrefetchTgtId(uint8_t num)
+    {
+        _prefetchTgtId = num;
+    }
+
+    uint8_t getPrefetchTgtId()
+    {
+        return _prefetchTgtId;
     }
 
     /**
@@ -1039,6 +1071,13 @@ class Request
     {
         return (_flags.isSet(PREFETCH | PF_EXCLUSIVE));
     }
+    bool
+    pfTgtIDDiffWithCacheOrgID() const
+    {
+        return  _flags.isSet(PREFETCH) &&
+                (_cacheOrgId != _prefetchTgtId);
+    }
+
     bool isPrefetchEx() const { return _flags.isSet(PF_EXCLUSIVE); }
     bool isLLSC() const { return _flags.isSet(LLSC); }
     bool isPriv() const { return _flags.isSet(PRIVILEGED); }
