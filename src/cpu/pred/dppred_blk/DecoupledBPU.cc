@@ -1,9 +1,5 @@
 /*
- * Copyright (c) 2014 The University of Wisconsin
- *
- * Copyright (c) 2006 INRIA (Institut National de Recherche en
- * Informatique et en Automatique  / French National Research Institute
- * for Computer Science and Applied Mathematics)
+ * Copyright (c) 2023 Todo
  *
  * All rights reserved.
  *
@@ -29,10 +25,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
-
-/* @file
- * Implementation of a TAGE branch predictor
  */
 
 #include "cpu/pred/dppred_blk/DecoupledBPU.hh"
@@ -1775,6 +1767,7 @@ DecoupledBPU::tick(){
         }
     }
 
+    /** gen intra squash to ifetch */
     toFetch->intra_squash = s2_squash || s3_squash;
     toFetch->intra_squashed_ftq_idxs = intra_squashed_ftq_idxs;
     if (s3_squash){

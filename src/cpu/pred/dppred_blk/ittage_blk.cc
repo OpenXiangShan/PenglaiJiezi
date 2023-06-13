@@ -31,9 +31,6 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/* @file
- * Implementation of a ITTAGE branch predictor
- */
 #include "cpu/pred/dppred_blk/ittage_blk.hh"
 
 #include <queue>

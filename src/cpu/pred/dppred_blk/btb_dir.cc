@@ -41,9 +41,7 @@
  */
 
 #include "cpu/pred/dppred_blk/btb_dir.hh"
-
 #include <algorithm>
-
 #include "arch/generic/pcstate.hh"
 #include "base/compiler.hh"
 #include "base/trace.hh"

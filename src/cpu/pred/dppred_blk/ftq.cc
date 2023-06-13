@@ -1,9 +1,5 @@
 /*
- * Copyright (c) 2014 The University of Wisconsin
- *
- * Copyright (c) 2006 INRIA (Institut National de Recherche en
- * Informatique et en Automatique  / French National Research Institute
- * for Computer Science and Applied Mathematics)
+ * Copyright (c) 2023 Todo
  *
  * All rights reserved.
  *
@@ -31,12 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/* @file
- * Implementation of a TAGE branch predictor
- */
-
 #include "cpu/pred/dppred_blk/ftq.hh"
-
 #include "base/intmath.hh"
 #include "base/logging.hh"
 #include "base/random.hh"

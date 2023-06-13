@@ -43,7 +43,6 @@
 #define __CPU_PRED_BTB_DIR_HH__
 
 #include <deque>
-
 #include "base/statistics.hh"
 #include "base/types.hh"
 #include "cpu/inst_seq.hh"

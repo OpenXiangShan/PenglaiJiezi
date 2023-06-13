@@ -31,25 +31,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/* @file
- * Implementation of a TAGE branch predictor. TAGE is a global-history based
- * branch predictor. It features a PC-indexed bimodal predictor and N
- * partially tagged tables, indexed with a hash of the PC and the global
- * branch history. The different lengths of global branch history used to
- * index the partially tagged tables grow geometrically. A small path history
- * is also used in the hash.
- *
- * All TAGE tables are accessed in parallel, and the one using the longest
- * history that matches provides the prediction (some exceptions apply).
- * Entries are allocated in components using a longer history than the
- * one that predicted when the prediction is incorrect.
- */
-
 #ifndef __CPU_PRED_LOOP_PRED_BLK_HH__
 #define __CPU_PRED_LOOP_PRED_BLK_HH__
 
 #include <vector>
-
 #include "base/statistics.hh"
 #include "cpu/null_static_inst.hh"
 #include "cpu/o3/comm.hh"

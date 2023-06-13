@@ -27,9 +27,7 @@
  */
 
 #include "cpu/pred/dppred_blk/btb_blk.hh"
-
 #include <cstdlib>
-
 #include "base/intmath.hh"
 #include "base/random.hh"
 #include "base/trace.hh"

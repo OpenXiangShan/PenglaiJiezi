@@ -31,14 +31,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/* @file
- * Implementation of a TAGE branch predictor
- */
-
 #include "cpu/pred/dppred_blk/btb_tage.hh"
-
 #include <cstdlib>
-
 #include "base/intmath.hh"
 #include "base/logging.hh"
 #include "base/random.hh"
