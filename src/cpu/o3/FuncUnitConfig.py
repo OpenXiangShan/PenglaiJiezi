@@ -122,8 +122,8 @@ class PredALU(FUDesc):
 
 
 class ReadPort(FUDesc):
-    opList = [OpDesc(opClass="MemRead", opLat=4),
-              OpDesc(opClass="FloatMemRead", opLat=4)]
+    opList = [OpDesc(opClass="MemRead", opLat=3),
+              OpDesc(opClass="FloatMemRead", opLat=3)]
     count = 2
 
 
