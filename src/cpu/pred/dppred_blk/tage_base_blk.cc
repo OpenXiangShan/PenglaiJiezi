@@ -35,9 +35,7 @@
  * Implementation of a TAGE branch predictor
  */
 #include "cpu/pred/dppred_blk/tage_base_blk.hh"
-
 #include <queue>
-
 #include "base/intmath.hh"
 #include "base/logging.hh"
 #include "cpu/pred/dppred_blk/comm_param.hh"

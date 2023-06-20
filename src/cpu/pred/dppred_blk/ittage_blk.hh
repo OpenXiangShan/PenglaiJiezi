@@ -35,7 +35,6 @@
 #define __CPU_PRED_ITTAGE_BLK_HH__
 
 #include <vector>
-
 #include "base/statistics.hh"
 #include "cpu/null_static_inst.hh"
 #include "cpu/o3/comm.hh"

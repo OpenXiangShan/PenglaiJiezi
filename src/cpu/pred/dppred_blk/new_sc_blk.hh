@@ -39,7 +39,6 @@
 #define __CPU_PRED_NEW_SC_BLK_HH__
 
 #include <vector>
-
 #include "base/logging.hh"
 #include "base/types.hh"
 #include "cpu/pred/dppred_blk/comm.hh"

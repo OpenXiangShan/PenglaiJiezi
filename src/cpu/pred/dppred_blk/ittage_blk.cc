@@ -32,9 +32,7 @@
  */
 
 #include "cpu/pred/dppred_blk/ittage_blk.hh"
-
 #include <queue>
-
 #include "base/intmath.hh"
 #include "base/logging.hh"
 #include "base/random.hh"
