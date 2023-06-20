@@ -22,33 +22,15 @@ function build_gem5()
 {
     mkdir $GEM5_BASE_DIR/build
     echo -e `nproc`
-    python3.6 $(which scons-3) build/RISCV/gem5.opt -j`nproc`
-}
-
-function git_pull_env_scripts()
-{
-    rm -rf /gem5_common_trace/env-scripts
-    cd /gem5_common_trace
-    git clone https://git.woa.com/qianlnzhang/env-scripts.git
-    
-    if [ $? -ne 0 ]; then
-        Print_Error "end: GEM5: FAILED, git clone env-scripts failed!!!"
-        exit 2
-    fi
-
-    cd -
+    python3 $(which scons-3) build/RISCV/gem5.opt --linker=mold -j`nproc`
 }
 
 function build_top()
 {
     Print_Progress "start"
     
-    Print_Progress "step0: git clone env-scripts"
-    git_pull_env_scripts
-    cp -r /gem5_common_trace/DRAMsim3 /data/landun/workspace/ext/dramsim3/
-
     Print_Progress "step1: clean GEM5"
-    clean_gem5
+    #clean_gem5
 
     Print_Progress "step2: build GEM5"
     build_gem5
