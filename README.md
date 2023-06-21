@@ -3,19 +3,19 @@
 JIEZI Simulator is a high-performance RISC-V performance simulator developed by Tencent Penglai Laboratory. The current version archieved  13.9/GHz Speccpu2006 score, 12.2/GHz specint2006 and 15.6/GHz specfp2006. We have gone through two stages:
 
 1. The micro-architecture of key performance components are aligned with the micro-architecture of Xiangshan Nanhu CPU.
-2. Then continue performance optimization and micro-architecture exploration base on 1.
+2. Optimizing performance and exploring micro-architecture based on the aligned micro-architecture.
 
 Performance optimization and microarchitectural exploration including:
 
-- **Front-end**: Implemented Enhanced SC Predictor,  Loop Predictor, and RAS Predictor based on speculative chain-list stack  and commit stack,  and Icache performance-related optimization.
-- **Back-end**: Analyze and optimize the configuration of out-of-order components such as LSQ and ROB. Implemented a mixed RMAP and HBMAP solution to enhance the rename table recovery solution. Merge the move eliminate feature in XS-gem5, and fix a bug which a long-term occupation of physical registers that not be released.
+- **Front-end**: Implemented Enhanced SC Predictor,  Loop Predictor, and RAS Predictor based on speculative chain-list stack  and commit stack, and Icache performance-related optimization.
+- **Back-end**: Analyzed and optimized the configuration of out-of-order components such as LSQ and ROB. Implemented a mixed RMAP and HBMAP solution to enhance the rename table recovery solution. Merge the move eliminate feature in XS-gem5, and fix a bug which a long-term occupation of physical registers that not be released.
 - **Memory System**: Implimented the Bingo and SPP Prefetcher, which are located in mixed Cache Level and prefetch to Current or Low Level Cache.
 
 Key performance component alignments including:
 
-- **Front-end**: Align Decoupled BPU, fetch bundle-based uBTB, BTB, TAGE, ITAGE, and FTQ components, align 4-stage instruction fetch pipeline stages and instruction prefetch performance.
-- **Back-end**: Align the function, quantity, and delay of execution units such as Branch Unit and ALU, and align the width of instruction issue and commit;
-- **Memory system**: Align the behavior and specifications of the Memory Voilation Predictor Storeset, and align some of the cache configuration parameters and performance  statistics.
+- **Front-end**: Align Decoupled BPU, fetch bundle-based uBTB, BTB, TAGE, ITAGE, and FTQ components, align 4-stage instruction fetch pipeline stages and instruction prefetch performance
+- **Back-end**: Align the function, quantity, and delay of execution units such as Branch Unit and ALU, and align the width of instruction issue and commit
+- **Memory system**: Align the behavior and specifications of the Memory Voilation Predictor Storeset, and align some of the cache configuration parameters and performance statistics
 
 The front-end is contributed by **yuweiyan (严余伟)** and **henglong (龙衡)**, the back-end is contributed by **denniskhu (胡凯)** and **zhuoli (李卓)**, and the memory system is contributed by **qianlnzhang (张乾龙)** and **deweichchen (陈德炜)**.
 
