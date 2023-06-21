@@ -7,9 +7,9 @@
 # @Description  : test script for gem5 spec2006 range checkpoints
 # @FilePath     : /GEM5/scripts/run_spec2006_range.sh
 
-#-----> script dir, the directory above scripts(i.e. GEM5/scripts/)
-export GEM5_SCRIPTS_DIR=${GEM5_BASE_DIR}/scripts
-
+#-----> base dir, the directory above scripts(i.e. GEM5/)
+export GEM5_BASE_DIR=$(cd "$(dirname ${BASH_SOURCE[0]})/.."; pwd )
+source $GEM5_BASE_DIR/scripts/env.sh
 
 function print_help()
 {
@@ -32,12 +32,12 @@ function print_help()
                 --threads `nproc`
         or
 
-        bash run_spec2006_range.sh /cdata/simpoint/spec06_rv64gcb_o2_20m/take_cpt \\
-                                   /cdata/zhuoli/git/GEM5 \\
-                                   /gem5_common_trace/spec06_rv64gcb_o2_20m/json/simpoint_summary.json \\
-                                   0 \\
-                                   20 \\
-                                   `nproc`
+        bash $GEM5_SCRIPTS_DIR/run_spec2006_range.sh /cdata/simpoint/spec06_rv64gcb_o2_20m/take_cpt \\
+             /cdata/zhuoli/git/GEM5 \\
+             /gem5_common_trace/spec06_rv64gcb_o2_20m/json/simpoint_summary.json \\
+             0 \\
+             20 \\
+             `nproc`
         "
 
 }

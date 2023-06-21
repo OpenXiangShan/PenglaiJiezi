@@ -2,9 +2,7 @@
 
 #-----> base dir, the directory above scripts(i.e. GEM5/)
 export GEM5_BASE_DIR=$(cd "$(dirname ${BASH_SOURCE[0]})/.."; pwd )
-
-#-----> script dir, the directory above scripts(i.e. GEM5/scripts/)
-export GEM5_SCRIPTS_DIR=${GEM5_BASE_DIR}/scripts
+source $GEM5_BASE_DIR/scripts/env.sh
 
 $GEM5_BASE_DIR/build/RISCV/gem5.opt  \
     --outdir=./outputhello \
