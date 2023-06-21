@@ -1,37 +1,82 @@
 # About
 
-This is the gem5 simulator for Xiangshan (XS-GEM5), which
-currently scores similar with Nanhu on SPEC CPU 2006.
-XS-GEM5 is enhanced with
+JIEZI Simulator is a high-performance RISC-V performance simulator developed by Tencent Penglai Laboratory. The current version of Spec cpu 2006 is 13.9 points/GHz, 12.2 points/GHz specint 2006, 15.6 points/GHz specfp 2006. We have gone through two stages: 
+1. The micro-architecture of key performance components is aligned with the micro-architecture of Xiangshan Nanhu CPUs
+2. Then continue performance optimization and micro-architecture exploration base on 1
 
-- Xiangshan RVGCpt: a cross-platform full-system checkpoint for RISC-V.
-- Xiangshan online Difftest: an API to check execution results online.
-- Frontend microarchitecture calibrated with Xiangshan V2 (Nanhu): Decoupled frontend, TAGESC, and ITTAGE,
-which performance better than LTAGE and TAGE-SCL shipped in official version on SPECCPU.
-- Instruction latency calibrated with Nanhu
-- Cache hierarchy, latency, and prefetchers calibrated with Nanhu.
-- A fixed Multi-Prefetcher framework with VA-PA translation support
-- A fixed BOP prefetcher
-- Parallel RV PTW (Page Table Walker) and walking state coalescing
-- Cascaded FMA
-- Move elimination
-- L2 TLB and TLB prefetching (coming soon).
-- Other functional or performance bug fixes.
+Performance optimization and microarchitectural exploration including:
+- **Front-end**: Implemented Enhanced SC Predictor,  Loop Predictor, and RAS Predictor based on speculative chain-list stack  and commit stack,  and Icache performance-related optimization. 
+- **Backend**: Analyze and optimize the configuration of out-of-order components such as LSQ and ROB. Implemented a mixed RMAP and HBMAP solution to enhance the rename table recovery solution. Merge the move eliminate feature in XS-gem5, and fix a bug which a long-term occupation of physical registers that not be released. 
+- **Memory System**: Implimented the Bingo and SPP Prefetcher, which are in mixed Cache Level and prefetch to Current or Low Level Cache.
+
+Key performance component alignments include:
+- **Front end**: Align Decoupled BPU, fetch bundle-based uBTB, BTB, TAGE, ITAGE, and FTQ components, align 4-stage instruction fetch pipeline stages and instruction prefetch performance.
+- **Backend**: Align the function, quantity, and delay of execution units such as Branch Unit and ALU, and align the width of instruction issue and commit;
+- **Memory access**: Align the behavior and specifications of the Memory Voilation Predictor Storeset, and align some of the cache configuration parameters and performance  statistics.
+
+  The front-end part is contributed by **yuweiyan (严余伟)** and **henglong (龙衡)**, the back-end part is contributed by **denniskhu (胡凯)** and **zhuoli (李卓)**, and the storage part is contributed by **qianlnzhang (张乾龙)** and **deweichchen (陈德炜)**.
+
+
+
+
+
 
 # A Short Doc
 
-### GCC & libboost
+## GCC & libboost
 
 - Use GCC > 9.4.0.
 - Install libboost.
 
-## Build GEM5
 
-```shell
-cd gem5
-scons build/RISCV/gem5.opt --gold-linker
-export gem5_home=`pwd`
-```
+## Building gem5
+- [official building docs](https://www.gem5.org/documentation/general_docs/building)
+- git clone GEM5
+- DRAMSim3
+    ```shell
+    cd ext/dramsim3
+    git clone https://github.com/umd-memsys/DRAMsim3.git
+    cd DRAMsim3 && mkdir build
+    cd build
+    cmake ..
+    make
+
+    Notes:
+        - Must rebuild gem5 after install DRAMSim3
+        - Must use DRAMSim3 with our costumized config
+
+    gem5.opt ... --mem-type=DRAMsim3 --dramsim3-ini=$gem5_home/xiangshan_DDR4_8Gb_x8_2400.ini ...
+    ```
+
+- mold linker(5 times faster than the default linker)
+    ```shell
+    wget https://github.com/rui314/mold/releases/download/v1.10.1/mold-1.10.1-x86_64-linux.tar.gz
+    tar zxvf mold-1.10.1-x86_64-linux.tar.gz
+    cp -r mold-1.10.1-x86_64-linux/bin/* /usr/local/bin
+    cp -r mold-1.10.1-x86_64-linux/lib/* /usr/local/lib/
+    cp -r mold-1.10.1-x86_64-linux/libexec/* /usr/local/libexec/
+    cp -r mold-1.10.1-x86_64-linux/share/* /usr/local/share/
+    ```
+
+- xs-env
+  ```shell
+  https://xiangshan-doc.readthedocs.io/zh_CN/latest/tools/xsenv/
+  ```
+
+- gem5 
+  ```shell
+  python3 $(which scons-3) build/RISCV/gem5.opt  --linker=mold -j`nproc`
+  or 
+  bash scripts/build.sh
+  ```
+
+
+## Bringup
+  ```shell
+    bash scripts/run_dhrystone.sh   # with print "Dhrystone PASS"
+    bash scripts/run_helloWorld.sh  # with print "Hello world!"
+  ```
+
 
 ## Produce RVGCpt checkpoints with NEMU
 
@@ -40,59 +85,41 @@ and [Build Linux kernel for Xiangshan](https://github.com/OpenXiangShan/XiangSha
 
 The process of SimPoint checkpointing includes ***3 individual steps***
 1. SimPoint Profiling to get BBVs. (To save space, they often output in compressed formats such as **bbv.gz**.)
-1. SimPoint clustering. You can also opt to Python and sk-learn to do k-means clustering. (In this step, what is typically obtained are the **positions** selected by SimPoint and their **weights**.)
-1. Taking checkpoints according to clustering results. (In the RVGCpt process, this step generates the **checkpoints** that will be used for simulation.)
+2. SimPoint clustering. You can also opt to Python and sk-learn to do k-means clustering. (In this step, what is typically obtained are the **positions** selected by SimPoint and their **weights**.)
+3. Taking checkpoints according to clustering results. (In the RVGCpt process, this step generates the **checkpoints** that will be used for simulation.)
 
 If you have problem generating SPECCPU checkpoints, following links might help you.
 - [The video to build SPECCPU, put it in Linux, and run it in NEMU to get SimPoint BBVs](https://drive.google.com/file/d/1msr_YijlYN4rxpn71bod1LAoRWs5VtAL/view?usp=sharing) (step 1)
 - [The document to do SimPoint clustering based on BBVs and take simpoint checkpoints](https://zhuanlan.zhihu.com/p/604396330) (step 2 & 3)
 
-## Difftest with NEMU
 
-The Difftest framework used in XS-GEM5 is similar to the one used in Xiangshan.
-Please use the [gem5-ref-main branch of NEMU](https://github.com/OpenXiangShan/NEMU/tree/gem5-ref-main) for difftest with XS-GEM5.
+## Spec2006 preparation
 
-``` shell
-git clone https://github.com/OpenXiangShan/NEMU.git -b gem5-ref-main
-cd NEMU
-export NEMU_HOME=`pwd`
-make riscv64-nohype-ref_defconfig
-make menuconfig  # then save configs
-make -j 10
 ```
-
-Then the contents of `build` directory should be 
+bash scripts/run_spec2006_single.sh # print usage
 ```
-build
-|-- obj-riscv64-nemu-interpreter-so
-|   `-- src
-`-- riscv64-nemu-interpreter-so
-```
-
-then use `riscv64-nemu-interpreter-so` as reference for GEM5,
-``` shell
-export ref_so=`realpath build/riscv64-nemu-interpreter-so`
-
-# This is not full command, but a piece of example.
-$gem5_home/build/gem5.opt ... --enable-difftest --difftest-ref-so $ref_so ...
-```
-
-
-## DRAMSim3
-
-Refer to [The readme for DRAMSim3](ext/dramsim3/README) to install DRAMSim3.
-
 Notes:
-- Must rebuild gem5 after install DRAMSim3
-- Must use DRAMSim3 with our costumized config
-
-`$gem5_home/build/gem5.opt ... --mem-type=DRAMsim3 --dramsim3-ini=$gem5_home/xiangshan_DDR4_8Gb_x8_2400.ini ...`
-
-## Default command to run
-
-see [The example running script](util/warmup_scripts/simple_gem5.sh)
+    - set --rerun to 9999 for the first time to generate task_info.txt(index of each checkpoint) in --gcpt_path
 
 
-# Original README
+## Running spec2006
 
-The README for official GEM5 is here: [Original README](./official-README.md)
+### Single
+```
+bash scripts/run_spec2006_single.sh
+```
+
+### Range
+```
+bash scripts/run_spec2006_range.sh
+```
+
+### All
+```
+bash scripts/run_spec2006_all.sh
+```
+
+### Report
+```
+bash scripts/run_spec2006_report.sh
+```
