@@ -19,7 +19,7 @@ function print_help()
         --gem5: workspace of GEM5 
         --json_path: path of simpoint summary json file
         --rerun_start: checkpoint start num
-        --rerun_end: checkpoint end num
+        --rerun_end: checkpoint end num (not included)
         --threads: checkpoints run in parallel, default is `nproc` - 1
 
     exmaple:
