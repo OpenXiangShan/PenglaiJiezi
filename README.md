@@ -71,7 +71,7 @@ JIEZI Simulator is based on opensource Gem5 and reused the features of XS-GEM5 b
 - gem5
   
   ```shell
-  python3 $(which scons-3) build/RISCV/gem5.opt  --linker=mold -j`nproc`
+  python3 $(which scons) build/RISCV/gem5.opt  --linker=mold -j`nproc`
   or 
   bash scripts/build.sh
   ```
