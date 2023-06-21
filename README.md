@@ -61,6 +61,7 @@ JIEZI Simulator is based on opensource Gem5 and reused the features of XS-GEM5 b
   cp -r mold-1.10.1-x86_64-linux/bin/* /usr/local/bin
   cp -r mold-1.10.1-x86_64-linux/lib/* /usr/local/lib/
   cp -r mold-1.10.1-x86_64-linux/libexec/* /usr/local/libexec/
+  cp -r mold-1.10.1-x86_64-linux/libexec/* /usr/local/libexec/mold/
   cp -r mold-1.10.1-x86_64-linux/share/* /usr/local/share/
   ```
 - xs-env
