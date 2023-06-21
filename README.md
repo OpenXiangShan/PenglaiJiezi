@@ -81,7 +81,7 @@ JIEZI Simulator is based on opensource Gem5 and reused the features of XS-GEM5 b
 
 ```shell
 bash scripts/run_dhrystone.sh   # with print "Dhrystone PASS"
-  bash scripts/run_helloWorld.sh  # with print "Hello world!"
+bash scripts/run_helloWorld.sh  # with print "Hello world!"
 ```
 
 ## Produce RVGCpt checkpoints with NEMU
