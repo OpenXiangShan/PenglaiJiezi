@@ -22,7 +22,7 @@ function build_gem5()
 {
     mkdir $GEM5_BASE_DIR/build
     echo -e `nproc`
-    python3 $(which scons-3) build/RISCV/gem5.opt --linker=mold -j`nproc`
+    python3 $(which scons) build/RISCV/gem5.opt --linker=mold -j`nproc`
 }
 
 function build_top()
