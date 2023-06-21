@@ -1,11 +1,18 @@
 #!/bin/bash
+
+#-----> base dir, the directory above scripts(i.e. GEM5/)
+export GEM5_BASE_DIR=$(cd "$(dirname ${BASH_SOURCE[0]})/.."; pwd )
+
+#-----> script dir, the directory above scripts(i.e. GEM5/scripts/)
+export GEM5_SCRIPTS_DIR=${GEM5_BASE_DIR}/scripts
+
 $GEM5_BASE_DIR/build/RISCV/gem5.opt  \
     --outdir=m5out/dhrystone \
     --debug-file=cache.output \
-    configs/example/fs.py \
+    $GEM5_BASE_DIR/configs/example/fs.py \
     --xiangshan-system \
     --cpu-type=DerivO3CPU \
-    --bp-type=DecoupledBPUWithFTB \
+    --bp-type=TAGE \
     --caches \
     --cacheline_size=64 \
     --l1i_size=128kB \
@@ -21,5 +28,5 @@ $GEM5_BASE_DIR/build/RISCV/gem5.opt  \
     --mem-type=DDR4_2400_16x4 \
     --mem-size=8GB \
     --num-cpus=1 \
-    --generic-rv-cpt=$GEM5_SCRIPTS_DIR/scripts/bin/dhrystone/dhrystone-riscv64-xs-flash.bin   \
+    --generic-rv-cpt=$GEM5_SCRIPTS_DIR/workload/dhrystone/dhrystone-riscv64-xs-flash.bin   \
     --raw-cpt

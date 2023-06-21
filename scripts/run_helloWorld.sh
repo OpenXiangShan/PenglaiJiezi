@@ -1,7 +1,14 @@
 #!/bin/bash
+
+#-----> base dir, the directory above scripts(i.e. GEM5/)
+export GEM5_BASE_DIR=$(cd "$(dirname ${BASH_SOURCE[0]})/.."; pwd )
+
+#-----> script dir, the directory above scripts(i.e. GEM5/scripts/)
+export GEM5_SCRIPTS_DIR=${GEM5_BASE_DIR}/scripts
+
 $GEM5_BASE_DIR/build/RISCV/gem5.opt  \
     --outdir=./outputhello \
-    ./configs/example/se.py \
+    $GEM5_BASE_DIR/configs/example/se.py \
     --cpu-type=DerivO3CPU \
     --caches \
     --cacheline_size=64 \
@@ -20,4 +27,4 @@ $GEM5_BASE_DIR/build/RISCV/gem5.opt  \
     --l2-hwp-type=BOPPrefetcher \
     --num-cpus=1 \
     -I=40000000 \
-    -c=$GEM5_SCRIPTS_DIR/scripts/bin/hello.nofpu
+    -c=$GEM5_SCRIPTS_DIR/workload/hello.nofpu
