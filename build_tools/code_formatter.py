@@ -165,7 +165,7 @@ class code_formatter(object, metaclass=code_formatter_meta):
         self._data = []
 
     def write(self, *args):
-        f = open(os.path.join(*args), "w")
+        f = open(os.path.join(*args), "w", encoding="utf-8")
         name, extension = os.path.splitext(f.name)
 
         # Add a comment to inform which file generated the generated file
